@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' file: data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; media-src 'self' track:; connect-src 'self' track:"
+    />
+    <title>Toolbar</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="shell" id="shell"></div>
+
+    <div class="modal" id="settings"></div>
+    <div class="toast-host" id="toast"></div>
+
+    <script src="js/util.js"></script>
+    <script src="js/clock.js"></script>
+    <script src="js/gauges.js"></script>
+    <script src="js/dock.js"></script>
+    <script src="js/workbench.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/settings.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>

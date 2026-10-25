@@ -1,0 +1,17 @@
+{
+  "name": "screen-toolbar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Full-screen toolbar for a dedicated 1920x540 display",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "displays": "electron ./tools/print-displays.js",
+    "diag": "electron ./tools/diagnose.js",
+    "demo": "node tools/make-demo-audio.js"
+  },
+  "devDependencies": {
+    "electron": "^33.3.1"
+  }
+}

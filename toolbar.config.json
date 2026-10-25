@@ -1,0 +1,109 @@
+{
+  "display": {
+    "mode": "auto",
+    "index": 2,
+    "match": {
+      "width": 1920,
+      "height": 540,
+      "tolerance": 80
+    },
+    "bounds": {
+      "x": 1707,
+      "y": 0,
+      "width": 1920,
+      "height": 550
+    }
+  },
+  "window": {
+    "alwaysOnTop": false,
+    "autoHideCursorMs": 5000
+  },
+  "metrics": {
+    "pollMs": 1500,
+    "historySize": 90,
+    "slowPollMs": 3000
+  },
+  "clipboard": {
+    "enabled": true,
+    "maxItems": 30,
+    "pollMs": 800
+  },
+  "theme": {
+    "accent": "#57b6ff"
+  },
+  "dockCategories": [
+    {
+      "name": "浏览器",
+      "icon": "🌐"
+    },
+    {
+      "name": "系统",
+      "icon": "⚙️"
+    },
+    {
+      "name": "开发",
+      "icon": "💻"
+    },
+    {
+      "name": "工具",
+      "icon": "🛠️"
+    }
+  ],
+  "dock": [
+    {
+      "name": "Edge",
+      "icon": "🌐",
+      "category": "浏览器",
+      "type": "path",
+      "target": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+    },
+    {
+      "name": "资源管理器",
+      "icon": "📁",
+      "category": "系统",
+      "type": "path",
+      "target": "C:\\Windows\\explorer.exe"
+    },
+    {
+      "name": "toolbar 项目",
+      "icon": "🧩",
+      "category": "开发",
+      "type": "path",
+      "target": "D:\\GitProject\\toolbar"
+    },
+    {
+      "name": "任务管理器",
+      "icon": "📊",
+      "category": "系统",
+      "type": "cmd",
+      "target": "taskmgr"
+    },
+    {
+      "name": "记事本",
+      "icon": "📝",
+      "category": "工具",
+      "type": "path",
+      "target": "C:\\Windows\\System32\\notepad.exe"
+    },
+    {
+      "name": "Windows 设置",
+      "icon": "⚙️",
+      "category": "系统",
+      "type": "url",
+      "target": "ms-settings:"
+    },
+    {
+      "name": "显示设置",
+      "icon": "🖥️",
+      "category": "系统",
+      "type": "url",
+      "target": "ms-settings:display"
+    }
+  ],
+  "music": {
+    "folder": "D:\\GitProject\\toolbar\\samples\\demo",
+    "recursive": true,
+    "volume": 0.7,
+    "repeat": "all"
+  }
+}

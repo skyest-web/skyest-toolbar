@@ -1,0 +1,21 @@
+{
+  "grid": {
+    "columns": ["330px", "minmax(0, 1fr)", "400px"],
+    "rows": ["32px", "minmax(118px, 0.82fr)", "minmax(150px, 1.18fr)", "78px"],
+    "areas": [
+      ["topbar", "topbar", "topbar"],
+      ["clock", "gauges", "workbench"],
+      ["clock", "player", "clipboard"],
+      ["dock", "dock", "clipboard"]
+    ]
+  },
+  "modules": [
+    { "id": "topbar", "name": "顶栏（设置与退出）", "enabled": true },
+    { "id": "clock", "name": "时钟与主机信息", "enabled": true },
+    { "id": "gauges", "name": "系统指标卡片", "enabled": true },
+    { "id": "workbench", "name": "待办与便签", "enabled": true },
+    { "id": "player", "name": "音乐播放器", "enabled": true },
+    { "id": "clipboard", "name": "剪贴板历史", "enabled": true },
+    { "id": "dock", "name": "快捷入口", "enabled": true }
+  ]
+}
