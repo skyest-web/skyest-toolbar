@@ -334,7 +334,6 @@ body:not(.ready) .shell {
 
 .task-input:focus,
 .notes-area:focus,
-.json-area:focus,
 .input:focus {
   outline: none;
   border-color: var(--accent);
@@ -905,6 +904,116 @@ body:not(.ready) .shell {
   font-size: 0.72rem;
 }
 
+/* ---------- 快捷方式管理面板 ---------- */
+.dock-editor-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1.25fr 1fr 1fr;
+  gap: 10px;
+}
+
+.entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.entry-row {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.entry-row.current {
+  border-color: var(--accent);
+}
+
+.entry-emoji {
+  flex: 0 0 auto;
+  font-size: 1.05rem;
+}
+
+.entry-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.entry-name {
+  font-size: 0.84rem;
+}
+
+.entry-target {
+  font-size: 0.7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-cat {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.entry-ops {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 3px;
+}
+
+.entry-ops .mini-btn {
+  width: auto;
+  padding: 0 6px;
+}
+
+.mini-btn.danger {
+  color: #ff7a7a;
+}
+
+.mini-btn.danger:hover {
+  color: #ff9c9c;
+  border-color: #ff7a7a;
+}
+
+.dk-add {
+  margin-top: 6px;
+}
+
+.dk-empty {
+  font-size: 0.8rem;
+  padding: 6px 2px;
+}
+
+.dk-cat-row .input {
+  font-size: 0.8rem;
+  background: transparent;
+}
+
+.dk-icon-input {
+  flex: 0 0 40px;
+  text-align: center;
+}
+
+.dk-cat-row .entry-cat {
+  flex: 0 0 auto;
+}
+
+.dk-form-ops {
+  margin-top: 4px;
+}
+
 /* ---------- modal ---------- */
 .modal {
   position: fixed;
@@ -1026,41 +1135,69 @@ body:not(.ready) .shell {
   color: var(--muted);
 }
 
-.module-list {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+/* ---------- 组件与位置面板 ---------- */
+.layout-editor-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 10px;
 }
 
-.module-row {
+.slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.slot-row {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+  padding: 5px 7px;
   background: var(--panel-2);
+  border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 3px 7px;
   font-size: 0.78rem;
 }
 
-.module-id {
-  color: var(--accent);
-  font-family: 'Cascadia Mono', Consolas, monospace;
-  font-size: 0.74rem;
-  min-width: 66px;
+.slot-where {
+  flex: 0 0 190px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.module-name {
-  flex: 1;
-  min-width: 0;
+.slot-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.slot-area {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.7rem;
+}
+
+.slot-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.slot-show {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   color: var(--muted);
 }
 
-.module-move {
-  display: flex;
-  gap: 3px;
+.drop-hint {
+  margin-top: 8px;
+  font-size: 0.72rem;
+  line-height: 1.5;
 }
 
 .mini-btn {
@@ -1100,21 +1237,6 @@ input[type='checkbox'] {
   accent-color: var(--accent);
   width: 16px;
   height: 16px;
-}
-
-.json-area {
-  flex: 1 1 0;
-  min-height: 54px;
-  width: 100%;
-  resize: none;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: #b6e0ff;
-  font-family: 'Cascadia Mono', Consolas, monospace;
-  font-size: 0.78rem;
-  line-height: 1.45;
-  padding: 8px;
 }
 
 .settings-footer {

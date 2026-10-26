@@ -55,49 +55,56 @@
       "icon": "🌐",
       "category": "浏览器",
       "type": "path",
-      "target": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+      "target": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+      "order": 1
     },
     {
       "name": "资源管理器",
       "icon": "📁",
       "category": "系统",
       "type": "path",
-      "target": "C:\\Windows\\explorer.exe"
+      "target": "C:\\Windows\\explorer.exe",
+      "order": 2
     },
     {
       "name": "toolbar 项目",
       "icon": "🧩",
       "category": "开发",
       "type": "path",
-      "target": "D:\\GitProject\\toolbar"
+      "target": "D:\\GitProject\\toolbar",
+      "order": 3
     },
     {
       "name": "任务管理器",
       "icon": "📊",
       "category": "系统",
       "type": "cmd",
-      "target": "taskmgr"
+      "target": "taskmgr",
+      "order": 4
     },
     {
       "name": "记事本",
       "icon": "📝",
       "category": "工具",
       "type": "path",
-      "target": "C:\\Windows\\System32\\notepad.exe"
+      "target": "C:\\Windows\\System32\\notepad.exe",
+      "order": 5
     },
     {
       "name": "Windows 设置",
       "icon": "⚙️",
       "category": "系统",
       "type": "url",
-      "target": "ms-settings:"
+      "target": "ms-settings:",
+      "order": 6
     },
     {
       "name": "显示设置",
       "icon": "🖥️",
       "category": "系统",
       "type": "url",
-      "target": "ms-settings:display"
+      "target": "ms-settings:display",
+      "order": 7
     }
   ],
   "music": {

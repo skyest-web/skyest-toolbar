@@ -38,3 +38,12 @@ TB.clipboard = {
     }
   }
 };
+
+TB.register({
+  id: 'clipboard',
+  name: '剪贴板历史',
+  cls: 'area clipboard',
+  build: () => TB.util.el('div', { id: 'clipboard' }),
+  init: (node) => TB.clipboard.init(node),
+  update: (state) => TB.clipboard.update(state)
+});

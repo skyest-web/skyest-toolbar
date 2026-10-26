@@ -3,6 +3,8 @@ const path = require('node:path');
 
 const LAYOUT_FILE = 'layout.json';
 
+// 位置（grid.areas 里的区域名）是固定的；slots 决定每个位置放哪个组件、是否显示。
+// 换位置 = 交换两个 slot 的 module；隐藏 = enabled:false，该区域留空。
 const DEFAULT_LAYOUT = {
   grid: {
     columns: ['330px', 'minmax(0, 1fr)', '400px'],
@@ -14,16 +16,46 @@ const DEFAULT_LAYOUT = {
       ['dock', 'dock', 'clipboard']
     ]
   },
-  modules: [
-    { id: 'topbar', name: '顶栏（设置与退出）', enabled: true },
-    { id: 'clock', name: '时钟与主机信息', enabled: true },
-    { id: 'gauges', name: '系统指标卡片', enabled: true },
-    { id: 'workbench', name: '待办与便签', enabled: true },
-    { id: 'player', name: '音乐播放器', enabled: true },
-    { id: 'clipboard', name: '剪贴板历史', enabled: true },
-    { id: 'dock', name: '快捷入口', enabled: true }
+  slots: [
+    { at: 'topbar', label: '顶栏（整行）', module: 'topbar', enabled: true },
+    { at: 'clock', label: '左侧竖条', module: 'clock', enabled: true },
+    { at: 'gauges', label: '中部上', module: 'gauges', enabled: true },
+    { at: 'workbench', label: '中部右上', module: 'workbench', enabled: true },
+    { at: 'player', label: '中部下', module: 'player', enabled: true },
+    { at: 'clipboard', label: '右侧竖条', module: 'clipboard', enabled: true },
+    { at: 'dock', label: '底部通栏', module: 'dock', enabled: true }
   ]
 };
+
+function areaNames(grid) {
+  const names = new Set();
+  for (const row of grid.areas || []) for (const token of row) if (token !== '.') names.add(token);
+  return names;
+}
+
+// 兼容 v1（modules: [{id, name, enabled}]）：id 同时当位置名和组件 id 用
+function normalize(raw) {
+  const grid = { ...DEFAULT_LAYOUT.grid, ...(raw.grid || {}) };
+  let slots;
+  if (Array.isArray(raw.slots) && raw.slots.length) {
+    slots = raw.slots.map((slot) => ({
+      at: String(slot.at || ''),
+      label: String(slot.label || slot.at || ''),
+      module: String(slot.module || ''),
+      enabled: slot.enabled !== false
+    }));
+  } else if (Array.isArray(raw.modules) && raw.modules.length) {
+    slots = raw.modules.map((module) => ({
+      at: String(module.id || ''),
+      label: String(module.name || module.id || ''),
+      module: String(module.id || ''),
+      enabled: module.enabled !== false
+    }));
+  } else {
+    slots = structuredClone(DEFAULT_LAYOUT.slots);
+  }
+  return { grid, slots };
+}
 
 function validate(layout) {
   const errors = [];
@@ -38,21 +70,22 @@ function validate(layout) {
       if (token !== '.' && !/^[a-z][a-z0-9]*$/.test(token)) errors.push(`grid.areas[${rowIndex}] 出现非法单元名 "${token}"`);
     }
   }
-  const ids = new Set(layout.modules.map((module) => module.id));
-  for (const row of areas) {
-    for (const token of row) if (token !== '.' && !ids.has(token)) errors.push(`区域名 "${token}" 未在 modules 中声明`);
+
+  const names = areaNames(layout.grid);
+  const seen = new Set();
+  for (const slot of layout.slots || []) {
+    if (!names.has(slot.at)) errors.push(`slots 里的位置名 "${slot.at}" 没出现在 grid.areas 中`);
+    if (seen.has(slot.at)) errors.push(`位置 "${slot.at}" 重复声明`);
+    seen.add(slot.at);
   }
+  for (const name of names) if (!seen.has(name)) errors.push(`区域 "${name}" 没有对应的 slot`);
   return errors;
 }
 
 function load(appRoot) {
   let layout = structuredClone(DEFAULT_LAYOUT);
   try {
-    const raw = JSON.parse(fs.readFileSync(path.join(appRoot, LAYOUT_FILE), 'utf8'));
-    layout = {
-      grid: { ...DEFAULT_LAYOUT.grid, ...(raw.grid || {}) },
-      modules: Array.isArray(raw.modules) && raw.modules.length ? raw.modules : DEFAULT_LAYOUT.modules
-    };
+    layout = normalize(JSON.parse(fs.readFileSync(path.join(appRoot, LAYOUT_FILE), 'utf8')));
   } catch (err) {
     if (err.code !== 'ENOENT') console.warn(`[layout] ${LAYOUT_FILE} 解析失败（${err.message}），使用默认布局`);
   }
@@ -64,7 +97,8 @@ function load(appRoot) {
   return layout;
 }
 
-function save(appRoot, layout) {
+function save(appRoot, rawLayout) {
+  const layout = normalize(rawLayout);
   const errors = validate(layout);
   if (errors.length) return { errors };
   const file = path.join(appRoot, LAYOUT_FILE);
@@ -72,4 +106,4 @@ function save(appRoot, layout) {
   return { file };
 }
 
-module.exports = { load, save, validate, LAYOUT_FILE };
+module.exports = { load, save, validate, normalize, DEFAULT_LAYOUT, LAYOUT_FILE };

@@ -396,3 +396,12 @@ TB.player = {
     }, 600);
   }
 };
+
+TB.register({
+  id: 'player',
+  name: '音乐播放器',
+  cls: 'area player-area',
+  build: () => TB.util.el('div', { id: 'player' }),
+  init: (node) => TB.player.init(node),
+  update: (state) => TB.player.update(state)
+});

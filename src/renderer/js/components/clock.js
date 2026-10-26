@@ -14,6 +14,7 @@ TB.clock = {
     }
 
     this.tick();
+    clearInterval(this.timer);
     this.timer = setInterval(() => this.tick(), 1000);
   },
 
@@ -34,3 +35,13 @@ TB.clock = {
     this.fields['屏幕'].textContent = display ? `${display.bounds.width}x${display.bounds.height} @${display.scaleFactor}x` : '--';
   }
 };
+
+// 组件注册：位置由 layout.json 的 slots 决定，这里只声明"我是什么、长什么样"
+TB.register({
+  id: 'clock',
+  name: '时钟与主机信息',
+  cls: 'area clock-area',
+  build: () => TB.util.el('div', { id: 'clock' }),
+  init: (node) => TB.clock.init(node),
+  update: (state) => TB.clock.update(state)
+});

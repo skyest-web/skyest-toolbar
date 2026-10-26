@@ -95,3 +95,12 @@ TB.workbench = {
     if (!this.tabs.hasChildNodes()) this.setView('tasks');
   }
 };
+
+TB.register({
+  id: 'workbench',
+  name: '待办与便签',
+  cls: 'area workbench',
+  build: () => TB.util.el('div', { id: 'workbench' }),
+  init: (node) => TB.workbench.init(node),
+  update: (state) => TB.workbench.update(state)
+});

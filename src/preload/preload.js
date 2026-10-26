@@ -21,6 +21,10 @@ contextBridge.exposeInMainWorld('deskToolbar', {
     openFile: () => invoke('layout:openFile')
   },
 
+  components: {
+    list: () => invoke('components:list')
+  },
+
   displays: {
     list: () => invoke('displays:list'),
     onChanged: (handler) => on('displays:changed', handler)
@@ -33,7 +37,8 @@ contextBridge.exposeInMainWorld('deskToolbar', {
 
   dock: {
     launch: (item) => invoke('dock:launch', item),
-    reveal: (target) => invoke('dock:reveal', target)
+    reveal: (target) => invoke('dock:reveal', target),
+    pickPath: (kind) => invoke('dock:pickPath', kind)
   },
 
   tasks: { save: (tasks) => invoke('tasks:save', tasks) },

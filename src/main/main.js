@@ -13,6 +13,18 @@ const { Store } = require('./services/store');
 const { ClipboardHistory } = require('./services/clipboard-history');
 
 const APP_ROOT = path.resolve(__dirname, '..', '..');
+const COMPONENT_DIR = path.join(APP_ROOT, 'src', 'renderer', 'js', 'components');
+
+// 组件是 drop-in 的：往 src/renderer/js/components/ 里放一个 .js 就会出现在组件列表里
+function componentFiles() {
+  try {
+    return fs.readdirSync(COMPONENT_DIR).filter((name) => name.endsWith('.js')).sort();
+  } catch (err) {
+    console.warn(`[components] 读取目录失败：${err.message}`);
+    return [];
+  }
+}
+
 let config = null;
 let layout = null;
 let win = null;
@@ -163,9 +175,13 @@ function registerIpc() {
     clipboard: clipboardHistory.list(),
     placement,
     displays: displayResolver.list(),
+    components: componentFiles(),
+    defaultLayout: layoutStore.DEFAULT_LAYOUT,
     appVersion: app.getVersion(),
     electron: process.versions.electron
   }));
+
+  ipcMain.handle('components:list', () => componentFiles());
 
   ipcMain.handle('config:save', (_event, patch) => {
     config = configStore.merge(configStore.load(APP_ROOT), patch);
@@ -199,6 +215,21 @@ function registerIpc() {
   });
 
   ipcMain.handle('music:lyrics', (_event, track) => music.lyricsFor(track));
+
+  ipcMain.handle('dock:pickPath', async (_event, kind) => {
+    const options = {
+      title: kind === 'folder' ? '选择文件夹' : kind === 'image' ? '选择图标图片' : '选择程序或文档',
+      defaultPath: kind === 'folder' ? app.getPath('home') : app.getPath('desktop'),
+      properties: kind === 'folder' ? ['openDirectory'] : ['openFile']
+    };
+    if (kind === 'image') options.filters = [{ name: '图片', extensions: ['png', 'ico', 'svg', 'jpg', 'jpeg', 'webp', 'bmp'] }];
+    else if (kind !== 'folder') options.filters = [
+      { name: '程序与文档', extensions: ['exe', 'lnk', 'bat', 'cmd', 'msi', 'msc', 'url', 'txt', 'md', 'pdf', 'docx', 'xlsx', 'pptx', 'html'] },
+      { name: '所有文件', extensions: ['*'] }
+    ];
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, options);
+    return canceled || !filePaths.length ? null : filePaths[0];
+  });
 
   ipcMain.handle('music:pickFolder', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog(win, {

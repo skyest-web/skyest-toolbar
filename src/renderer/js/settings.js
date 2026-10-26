@@ -26,28 +26,14 @@ TB.settings = {
     return box;
   },
 
-  jsonArea(value) {
-    return TB.util.el('textarea', { class: 'json-area', spellcheck: 'false', text: JSON.stringify(value, null, 2) });
-  },
-
-  parseJson(area, label) {
-    try {
-      const parsed = JSON.parse(area.value);
-      if (!Array.isArray(parsed)) throw new Error(`${label} 顶层需要是数组 []`);
-      return { value: parsed };
-    } catch (err) {
-      return { error: `${label} 不是合法 JSON：${err.message}` };
-    }
-  },
-
   card(title, ...fields) {
     return TB.util.el('section', { class: 'card' }, [TB.util.el('h3', { text: title }), ...fields]);
   },
 
-  open(focusDock) {
+  open() {
     const state = TB.app.state;
     const config = structuredClone(state.config);
-    const layout = structuredClone(state.grid);
+    const layout = state.grid;
     const displays = state.displays || [];
 
     // ----- 屏幕 -----
@@ -104,37 +90,9 @@ TB.settings = {
     const musicRecursive = this.checkbox(config.music.recursive);
     const musicVolume = this.number(Math.round(config.music.volume * 100), 0, 100, 5);
 
-    // ----- 模块开关（来自 layout.json 的 modules 数组） -----
-    const moduleRows = TB.util.el('div', { class: 'module-list' });
-    const renderModules = () => {
-      moduleRows.innerHTML = '';
-      layout.modules.forEach((module, index) => {
-        const box = this.checkbox(module.enabled);
-        box.addEventListener('change', () => (module.enabled = box.checked));
-        const move = (delta) => () => {
-          const target = index + delta;
-          if (target < 0 || target >= layout.modules.length) return;
-          [layout.modules[index], layout.modules[target]] = [layout.modules[target], layout.modules[index]];
-          renderModules();
-        };
-        moduleRows.appendChild(
-          TB.util.el('div', { class: 'module-row' }, [
-            box,
-            TB.util.el('span', { class: 'module-id', text: module.id }),
-            TB.util.el('span', { class: 'module-name', text: module.name }),
-            TB.util.el('span', { class: 'module-move' }, [
-              TB.util.el('button', { class: 'mini-btn', text: '↑', title: '上移（只影响 JSON 顺序）', onclick: move(-1) }),
-              TB.util.el('button', { class: 'mini-btn', text: '↓', title: '下移', onclick: move(1) })
-            ])
-          ])
-        );
-      });
-    };
-    renderModules();
-
+    // ----- 组件与位置（layout.json 的 slots） -----
+    const visibleCount = layout.slots.filter((slot) => slot.enabled && slot.module).length;
     const gridSummary = `${layout.grid.columns.length} 列 × ${layout.grid.rows.length} 行`;
-    const dockArea = this.jsonArea(config.dock);
-    const categoriesArea = this.jsonArea(config.dockCategories);
 
     const screenCard = this.card(
       '屏幕目标',
@@ -186,24 +144,30 @@ TB.settings = {
     );
 
     const moduleCard = TB.util.el('section', { class: 'card' }, [
-      TB.util.el('h3', { text: '模块开关' }),
-      TB.util.el('p', { class: 'muted', text: `关掉后该区域留空；网格与位置直接改 layout.json（当前 ${gridSummary}）` }),
-      moduleRows
+      TB.util.el('h3', { text: '组件与位置' }),
+      TB.util.el('p', { class: 'muted', text: `位置固定（当前 ${gridSummary}），换组件或关掉不显示都在面板里做；改动直接写入 layout.json` }),
+      TB.util.el('button', {
+        class: 'ghost-btn',
+        text: '打开组件与位置',
+        onclick: () => {
+          this.close();
+          TB.layoutEditor.open();
+        }
+      }),
+      TB.util.el('p', { class: 'muted', text: `已注册 ${TB.components.size} 个组件 / 显示中 ${visibleCount} 个位置` })
     ]);
 
     const dockCard = TB.util.el('section', { class: 'card' }, [
-      TB.util.el('h3', { text: '导航分类 dockCategories' }),
-      TB.util.el('p', { class: 'muted', text: '决定 dock 上分类标签的顺序与图标：{ "name": "系统", "icon": "⚙️" }；条目里出现但这里没声明的分类会自动补到末尾' }),
-      categoriesArea,
-      TB.util.el('h3', { text: '快捷入口 dock' }),
-      TB.util.el('p', { class: 'muted', text: '每项：{ "name": "名称", "icon": "emoji 或图片路径", "category": "分类名", "type": "path|url|cmd", "target": "路径或链接" }' }),
-      dockArea
+      TB.util.el('h3', { text: '快捷方式' }),
+      TB.util.el('p', { class: 'muted', text: '入口和分类都用表单增删改，保存时立刻写入 toolbar.config.json；dock 上的 ＋ 打开同一个面板' }),
+      TB.util.el('button', { class: 'ghost-btn', text: '打开快捷方式管理', onclick: () => TB.dockEditor.open() }),
+      TB.util.el('p', { class: 'muted', text: `当前 ${config.dock.length} 个入口 / ${config.dockCategories.length} 个分类` })
     ]);
 
     const modal = TB.util.el('div', { class: 'settings-modal' }, [
       TB.util.el('div', { class: 'settings-head' }, [
         TB.util.el('h2', { text: '工具栏设置' }),
-        TB.util.el('span', { class: 'muted', text: '保存到项目根目录 toolbar.config.json + layout.json' })
+        TB.util.el('span', { class: 'muted', text: '保存到项目根目录 toolbar.config.json；组件位置在「组件与位置」面板里改 layout.json' })
       ]),
       TB.util.el('div', { class: 'settings-grid' }, [screenCard, refreshCard, TB.util.el('div', { class: 'card-col' }, [musicCard, moduleCard]), dockCard]),
       TB.util.el('div', { class: 'settings-footer' }, [
@@ -211,10 +175,6 @@ TB.settings = {
           class: 'primary',
           text: '保存并应用',
           onclick: async () => {
-            const dock = this.parseJson(dockArea, 'dock');
-            const categories = this.parseJson(categoriesArea, 'dockCategories');
-            if (dock.error || categories.error) return TB.app.toast(dock.error || categories.error, 'error');
-
             config.display = {
               mode: modeSelect.value,
               index: Number(indexSelect.value),
@@ -234,16 +194,14 @@ TB.settings = {
               volume: TB.util.clamp(Number(musicVolume.value) / 100, 0, 1),
               repeat: config.music.repeat
             };
-            config.dockCategories = categories.value;
-            config.dock = dock.value;
-
-            const layoutResult = await TB.api.layout.save(layout);
-            if (layoutResult.errors) return TB.app.toast(`layout.json：${layoutResult.errors.join('；')}`, 'error');
+            // dock 与 layout 分别由「快捷方式管理」「组件与位置」面板即时写入，
+            // 这里不带着旧副本，避免覆盖那边的改动
+            delete config.dock;
+            delete config.dockCategories;
 
             const result = await TB.api.config.save(config);
-            state.grid = layoutResult.layout;
             TB.app.applyConfigResult(result);
-            TB.app.toast(`已写入 ${result.file} 与 ${layoutResult.file}`, 'ok');
+            TB.app.toast(`已写入 ${result.file}`, 'ok');
             this.close();
           }
         }),
@@ -259,7 +217,6 @@ TB.settings = {
     this.root.innerHTML = '';
     this.root.appendChild(modal);
     this.root.classList.add('open');
-    if (focusDock) dockArea.focus();
   },
 
   close() {

@@ -2,7 +2,7 @@ TB.dock = {
   init(root) {
     root.innerHTML = '';
     this.list = TB.util.el('div', { class: 'dock-items' });
-    const add = TB.util.el('button', { class: 'dock-add', title: '添加工具栏入口（写入配置 dock）', text: '＋', onclick: () => TB.settings.open('dock') });
+    const add = TB.util.el('button', { class: 'dock-add', title: '管理快捷方式（新增 / 编辑 / 删除）', text: '＋', onclick: () => TB.dockEditor.open() });
     root.append(this.list, add);
 
     if (!this.escBound) {
@@ -108,3 +108,12 @@ TB.dock = {
     else TB.api.dock.reveal(item.target);
   }
 };
+
+TB.register({
+  id: 'dock',
+  name: '快捷入口',
+  cls: 'area dock-area',
+  build: () => TB.util.el('div', { id: 'dock' }),
+  init: (node) => TB.dock.init(node),
+  update: (state) => TB.dock.update(state)
+});

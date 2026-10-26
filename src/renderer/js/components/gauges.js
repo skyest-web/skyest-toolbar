@@ -108,3 +108,12 @@ TB.gauges = {
     });
   }
 };
+
+TB.register({
+  id: 'gauges',
+  name: '系统指标卡片',
+  cls: 'area gauges',
+  build: () => TB.util.el('div', { id: 'gauges', class: 'gauge-row' }),
+  init: (node) => TB.gauges.init(node),
+  update: (state) => TB.gauges.update(state)
+});
