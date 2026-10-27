@@ -13,6 +13,7 @@ const { Store } = require('./services/store');
 const { ClipboardHistory } = require('./services/clipboard-history');
 const { AiChat } = require('./services/ai');
 const { AiKey } = require('./services/ai-key');
+const { Voice } = require('./services/voice');
 
 const APP_ROOT = path.resolve(__dirname, '..', '..');
 const COMPONENT_DIR = path.join(APP_ROOT, 'src', 'renderer', 'js', 'components');
@@ -34,6 +35,7 @@ let store = null;
 let clipboardHistory = null;
 let aiKey = null;
 let aiChat = null;
+let voice = null;
 let placement = null;
 let fastTimer = null;
 let slowTimer = null;
@@ -178,6 +180,7 @@ function registerIpc() {
     player: store.get('player'),
     clipboard: clipboardHistory.list(),
     ai: { messages: aiChat.messages, key: aiKey.status() },
+    voice: voice ? voice.status() : null,
     placement,
     displays: displayResolver.list(),
     components: componentFiles(),
@@ -278,6 +281,28 @@ function registerIpc() {
   ipcMain.handle('ai:key:set', (_event, key) => aiKey.set(key));
   ipcMain.handle('ai:key:clear', () => aiKey.clear());
 
+  ipcMain.handle('voice:status', () => voice.status());
+  ipcMain.handle('voice:asr-start', (_event, sampleRate) => voice.asrStart(sampleRate));
+  ipcMain.handle('voice:asr-chunk', (_event, id, samples, sampleRate) => {
+    voice.asrChunk(id, new Float32Array(samples), sampleRate);
+    return true;
+  });
+  ipcMain.handle('voice:asr-end', (_event, id) => {
+    voice.asrEnd(id);
+    return true;
+  });
+  ipcMain.handle('voice:asr-cancel', (_event, id) => {
+    voice.asrCancel(id);
+    return true;
+  });
+  ipcMain.handle('voice:speak', async (_event, text, extra) => {
+    try {
+      return { ok: true, audio: await voice.speak(text, extra) };
+    } catch (error) {
+      return { ok: false, kind: error.kind || 'tts', message: error.message || String(error) };
+    }
+  });
+
   ipcMain.handle('app:quit', () => app.quit());
   ipcMain.handle('app:relaunch', () => {
     app.relaunch();
@@ -296,6 +321,7 @@ function applyPolling() {
     clipboardHistory.start();
   }
   if (aiChat) aiChat.syncPersistence();
+  if (voice) voice.sync();
   startTicker();
 }
 
@@ -318,6 +344,10 @@ if (!gotLock) {
     clipboardHistory.start();
 
     aiKey = new AiKey(app.getPath('userData'));
+
+    voice = new Voice({ appRoot: APP_ROOT, getConfig: () => config, emit: push });
+    voice.sync();
+
     aiChat = new AiChat({
       store,
       getKey: () => aiKey.get(),
@@ -335,6 +365,7 @@ if (!gotLock) {
   app.on('before-quit', () => {
     stopTicker();
     if (clipboardHistory) clipboardHistory.stop();
+    if (voice) voice.shutdown();
     if (store) store.flush();
   });
 

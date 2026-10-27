@@ -121,6 +121,20 @@
     "contextMessages": 12,
     "timeoutMs": 60000,
     "firstByteTimeoutMs": 15000,
-    "persistHistory": true
+    "persistHistory": true,
+    "name": "小肥鱼",
+    "persona": "video",
+    "emotion": true,
+    "motion": "full"
+  },
+  "voice": {
+    "enabled": true,
+    "ttsEngine": "auto",
+    "ttsVoice": "zh-CN-XiaoyiNeural",
+    "ttsPitch": "+3Hz",
+    "ttsSpeed": 1,
+    "ttsSid": 3,
+    "autoSpeak": true,
+    "autoSend": true
   }
 }

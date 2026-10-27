@@ -157,6 +157,62 @@ TB.settings = {
       config.ai.motion
     );
 
+    // ----- 语音 -----
+    const voiceEnabled = this.checkbox(config.voice.enabled);
+    const voiceEngine = this.select(
+      [
+        ['auto', '自动（离线优先，失败走在线）'],
+        ['kokoro', '只用离线 Kokoro'],
+        ['edge', '只用在线 edge-tts']
+      ],
+      config.voice.ttsEngine
+    );
+    const voiceName = this.select(
+      [
+        ['zh-CN-XiaoyiNeural', '晓伊（女·少女音，最甜）'],
+        ['zh-CN-XiaoxiaoNeural', '晓晓（女·温暖大姐姐）'],
+        ['zh-CN-YunxiaNeural', '云夏（男童·软糯）'],
+        ['zh-CN-YunxiNeural', '云希（男·普通话）'],
+        ['zh-CN-YunjianNeural', '云健（男·普通话）'],
+        ['zh-CN-YunyangNeural', '云扬（男·新闻播报）']
+      ],
+      config.voice.ttsVoice
+    );
+    // edge 的 pitch 只认 Hz；范围给到 ±，太往上就变成电子音了
+    const voicePitch = this.select(
+      [
+        ['-4Hz', '更低沉'],
+        ['+0Hz', '原调'],
+        ['+3Hz', '略亮（默认）'],
+        ['+6Hz', '甜美'],
+        ['+9Hz', '很嗲']
+      ],
+      config.voice.ttsPitch || '+3Hz'
+    );
+    const sidCount = Number(TB.voice?.status?.tts?.numSpeakers) || 103;
+    const voiceSid = this.number(config.voice.ttsSid ?? 0, 0, sidCount - 1, 1);
+    const voiceSpeed = this.number(config.voice.ttsSpeed, 0.6, 1.6, 0.05);
+    const voiceAutoSpeak = this.checkbox(config.voice.autoSpeak);
+    const voiceAutoSend = this.checkbox(config.voice.autoSend);
+    const voiceStatusHint = TB.util.el('span', {
+      class: 'field-hint',
+      text: TB.voice?.status?.running
+        ? `进程在跑；离线识别${TB.voice.status.models.asr ? '已装' : '缺模型'}，离线朗读${TB.voice.status.models.tts ? '已装' : '缺模型'}`
+        : '语音进程未启动（模型未安装时先在项目目录跑 npm run voice:install）'
+    });
+    const voicePreview = TB.util.el('button', {
+      class: 'ghost-btn',
+      text: '试听',
+      // 用面板上当前（还没保存）的值合成，改一项就能立刻听，不用先存再试
+      onclick: () => TB.voice?.preview?.({
+        engine: voiceEngine.value === 'auto' ? undefined : voiceEngine.value,
+        voice: voiceName.value,
+        pitch: voicePitch.value,
+        sid: Number(voiceSid.value),
+        speed: Number(voiceSpeed.value)
+      })
+    });
+
     const aiCard = this.card(
       'AI 对话',
       this.field('DeepSeek 密钥', TB.util.el('div', { class: 'inline' }, [keyInput, saveKey, clearKey]), keyHint),
@@ -172,6 +228,21 @@ TB.settings = {
       this.field('宠物动画', aiMotion, '只有「关闭」真省 CPU：视频版常驻约 23% 单核，关闭后 3%')
     );
     aiCard.dataset.card = 'ai';
+
+    const voiceCard = this.card(
+      '语音',
+      this.field('启用语音', voiceEnabled, '关掉后宠物只听打字，不发音也不识别'),
+      this.field('模型状态', voiceStatusHint, '离线模型放在项目 models/，装法：npm run voice:install'),
+      this.field('朗读引擎', voiceEngine, '在线 edge-tts 是人录的音色、最像人，联网才能用；离线 Kokoro 全 CPU、不出网，但偏平。自动=在线优先、断网退回离线'),
+      this.field('在线音色', voiceName, '走在线时生效；默认「晓伊」就是偏甜妹的那个'),
+      this.field('音高', voicePitch, '在线音色的明暗，往上更甜更嗲，往下更沉；只对在线音色生效'),
+      this.field('离线音色 (sid)', voiceSid, `断网兜底时用的离线说话人编号，0–${(Number(TB.voice?.status?.tts?.numSpeakers) || 103) - 1}；离线没有音高可调`),
+      this.field('语速', voiceSpeed, '1.0 为原速；在线按百分率、离线按倍速各自换算'),
+      this.field('自动朗读回复', voiceAutoSpeak, '回复完成后逐句播放，宠物口型跟着声音走'),
+      this.field('说完即发送', voiceAutoSend, '关掉后识别结果只填进输入框，你改完再按回车'),
+      this.field('试听', voicePreview)
+    );
+    voiceCard.dataset.card = 'voice';
 
     // ----- 组件与位置（layout.json 的 slots） -----
     const visibleCount = layout.slots.filter((slot) => slot.enabled && slot.module).length;
@@ -255,7 +326,7 @@ TB.settings = {
       TB.util.el('div', { class: 'settings-grid' }, [
         screenCard,
         refreshCard,
-        TB.util.el('div', { class: 'card-col' }, [musicCard, aiCard, moduleCard]),
+        TB.util.el('div', { class: 'card-col' }, [musicCard, aiCard, voiceCard, moduleCard]),
         dockCard
       ]),
       TB.util.el('div', { class: 'settings-footer' }, [
@@ -294,6 +365,17 @@ TB.settings = {
               persona: aiPersona.value,
               emotion: aiEmotion.checked,
               motion: aiMotion.value
+            };
+            config.voice = {
+              ...config.voice,
+              enabled: voiceEnabled.checked,
+              ttsEngine: voiceEngine.value,
+              ttsVoice: voiceName.value,
+              ttsPitch: voicePitch.value,
+              ttsSpeed: TB.util.clamp(Number(voiceSpeed.value), 0.6, 1.6),
+              ttsSid: Math.round(TB.util.clamp(Number(voiceSid.value), 0, (Number(TB.voice?.status?.tts?.numSpeakers) || 103) - 1)),
+              autoSpeak: voiceAutoSpeak.checked,
+              autoSend: voiceAutoSend.checked
             };
             // dock 与 layout 分别由「快捷方式管理」「组件与位置」面板即时写入，
             // 这里不带着旧副本，避免覆盖那边的改动

@@ -1339,6 +1339,8 @@ input[type='checkbox'] {
   min-height: 0;
   height: 100%;
   width: 100%;
+  /* .ai-compose 浮层的定位基准 */
+  position: relative;
 }
 
 .ai-head {
@@ -1568,13 +1570,25 @@ input[type='checkbox'] {
   display: block;
 }
 
-.ai-foot {
-  display: flex;
+/* 原来常驻的 .ai-foot：现在只在打字或录音时浮出来，平时面板底部只剩宠物 */
+.ai-compose {
+  display: none;
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
   gap: 5px;
   align-items: flex-end;
   padding: 6px;
-  border-top: 1px solid var(--line);
-  flex: 0 0 auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.35);
+  z-index: 3;
+}
+
+.ai-compose.open {
+  display: flex;
 }
 
 .ai-input {
@@ -1597,14 +1611,56 @@ input[type='checkbox'] {
   border-color: var(--accent);
 }
 
-.ai-foot .primary,
-.ai-foot .ghost-btn {
+/* 识别中的草稿态：让用户一眼看出这行字是机器写的，还没发出去 */
+.ai-input.voice-live {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.voice-mic {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.voice-mic:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.voice-mic:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.voice-mic.recording {
+  border-color: var(--error);
+  color: var(--error);
+  animation: voice-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes voice-pulse {
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--error) 30%, transparent);
+  }
+}
+
+.ai-compose .primary,
+.ai-compose .ghost-btn {
   flex: 0 0 auto;
   padding: 6px 10px;
   font-size: 0.78rem;
 }
 
-.ai-foot .primary:disabled {
+.ai-compose .primary:disabled {
   color: var(--muted);
   cursor: default;
 }

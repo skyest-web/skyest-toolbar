@@ -74,5 +74,17 @@ contextBridge.exposeInMainWorld('deskToolbar', {
   app: {
     quit: () => invoke('app:quit'),
     relaunch: () => invoke('app:relaunch')
+  },
+
+  voice: {
+    status: () => invoke('voice:status'),
+    asrStart: (sampleRate) => invoke('voice:asr-start', sampleRate),
+    asrChunk: (id, samples, sampleRate) => invoke('voice:asr-chunk', id, samples, sampleRate),
+    asrEnd: (id) => invoke('voice:asr-end', id),
+    asrCancel: (id) => invoke('voice:asr-cancel', id),
+    speak: (text, extra) => invoke('voice:speak', text, extra),
+    onAsr: (handler) => on('voice:asr', handler),
+    onStatus: (handler) => on('voice:status', handler),
+    onError: (handler) => on('voice:error', handler)
   }
 });

@@ -10,11 +10,18 @@
     "displays": "electron ./tools/print-displays.js",
     "diag": "electron ./tools/diagnose.js",
     "test:ai": "node ./tools/ai-mock-test.js",
+    "voice:install": "node ./tools/install-voice.js",
+    "voice:selftest": "electron ./tools/voice-selftest.js",
+    "voice:tryout": "electron ./tools/voice-tryout.js",
     "package": "node ./tools/package.js",
     "demo": "node tools/make-demo-audio.js"
   },
   "devDependencies": {
     "@electron/packager": "^20.3.0",
     "electron": "^33.3.1"
+  },
+  "dependencies": {
+    "node-edge-tts": "^1.2.12",
+    "sherpa-onnx-node": "^2.0.1"
   }
 }

@@ -5,7 +5,9 @@ TB.ai = {
     this.head = TB.util.el('div', { class: 'ai-head' }, [
       TB.util.el('span', { class: 'panel-title', text: TB.app.state.config?.ai?.name || 'AI 伙伴' }),
       this.status,
-      TB.util.el('button', { class: 'link-btn', text: '清空', title: '清空对话历史', onclick: () => this.clear() })
+      TB.util.el('button', { class: 'link-btn', text: '清空', title: '清空对话历史', onclick: () => this.clear() }),
+      // 双击宠物原来是开设置的，现在让位给「双击打字」，设置得有个常驻入口
+      TB.util.el('button', { class: 'link-btn', text: '设置', title: '打开 AI 与语音设置', onclick: () => TB.settings.open('ai') })
     ]);
 
     this.bubbleText = TB.util.el('div', { class: 'ai-bubble-text' });
@@ -29,14 +31,24 @@ TB.ai = {
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         this.submit();
+      } else if (event.key === 'Escape') {
+        this.closeCompose(true);
       }
     });
     this.list.addEventListener('scroll', () => this.trackStick(), { passive: true });
 
     this.send = TB.util.el('button', { class: 'primary', text: '发送', onclick: () => this.submit() });
     this.stop = TB.util.el('button', { class: 'ghost-btn', text: '停止', onclick: () => TB.api.ai.abort() });
+    // 原来这条是常驻的 .ai-foot；现在改成浮层，只在打字或录音时盖在面板底部
+    this.compose = TB.util.el('div', { class: 'ai-compose' }, [this.input, this.send, this.stop]);
 
-    root.append(this.head, this.stage, this.history, this.jump, TB.util.el('div', { class: 'ai-foot' }, [this.input, this.send, this.stop]));
+    root.append(this.head, this.stage, this.history, this.jump, this.compose);
+    // 点浮层以外任何地方就收起（监听挂在 root 上：组件重建时随旧节点一起消失，不会累积）
+    root.addEventListener('pointerdown', (event) => {
+      if (!this.compose.classList.contains('open')) return;
+      if (this.compose.contains(event.target)) return;
+      this.closeCompose();
+    });
 
     // persona 决定渲染后端：video=蓝毛小女仆（webm 精灵），pet=猫团子 SVG，plain=不出宠物
     this.pet = this.persona() === 'pet' ? TB.pet : TB.petVideo;
@@ -49,19 +61,42 @@ TB.ai = {
       TB.app.state.ai = { ...TB.app.state.ai, key };
       this.update(TB.app.state);
     });
+    TB.voice?.init(this);
   },
 
-  // 单击延后 260ms 给双击让位；流式回复中不响应，避免和「停止」抢注意力
+  // 单击=开麦说话，双击=打字浮层，右键=打断当前回复/朗读。
+  // 单击延后 260ms 给双击让位（浏览器连发 click/click/dblclick，两次 click 的定时器都会被 dblclick 清掉）
   bindPet() {
     this.petHost.addEventListener('click', () => {
-      if (TB.app.state.ai?.streaming) return;
       clearTimeout(this.tapTimer);
-      this.tapTimer = setTimeout(() => this.pet.react?.(this.petHandle), 260);
+      this.tapTimer = setTimeout(() => {
+        this.pet.react?.(this.petHandle);
+        // tap() 返回 false = 开不了麦（没装语音模型或设置里关了），那就直接给打字入口
+        if (!TB.voice?.tap()) this.openCompose(true);
+      }, 260);
     });
     this.petHost.addEventListener('dblclick', () => {
       clearTimeout(this.tapTimer);
-      TB.settings.open('ai');
+      this.openCompose(true);
     });
+    this.petHost.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      TB.voice?.stopSpeaking();
+      if (TB.app.state.ai?.streaming) TB.api.ai.abort();
+    });
+  },
+
+  openCompose(focus) {
+    this.compose.classList.add('open');
+    if (focus) this.input.focus();
+  },
+
+  closeCompose(force) {
+    // 录音中收起就看不见实时字幕；有草稿时不收起，那是「说完即发送」关掉后等着手改的字
+    if (TB.voice?.recording) return;
+    if (!force && this.input.value.trim()) return;
+    this.compose.classList.remove('open');
+    if (this.compose.contains(document.activeElement)) this.input.blur();
   },
 
   persona() {
@@ -112,6 +147,7 @@ TB.ai = {
     const text = this.input.value.trim();
     if (!text) return;
     this.input.value = '';
+    this.closeCompose(true);
     this.stick = true;
     TB.app.state.ai = { ...TB.app.state.ai, error: null, stream: { text: '', reasoning: '' } };
     await TB.api.ai.send(text);
@@ -172,7 +208,8 @@ TB.ai = {
     this.send.disabled = Boolean(ai.streaming);
     this.stop.classList.toggle('hidden', !ai.streaming);
 
-    const talking = Boolean(ai.streaming && stream?.text);
+    // 装了语音就以真实发声为准（真口型）；没装模型时退回「流式即在说话」的老行为
+    const talking = TB.voice?.speaking || (!TB.voice?.ttsReady() && Boolean(ai.streaming && stream?.text));
     let mood;
     if (ai.error) mood = 'error';
     else if (ai.streaming && !talking) mood = 'curious';
@@ -229,7 +266,7 @@ TB.ai = {
       this.list.appendChild(
         TB.util.el('div', { class: 'ai-empty muted' }, [
           ai.key?.set
-            ? TB.util.el('span', { text: '还没有对话。输入问题，回车发送。' })
+            ? TB.util.el('span', { text: '还没有对话。单击宠物说话，双击打字。' })
             : TB.util.el('button', { class: 'link-btn', text: '先在设置里填 DeepSeek 密钥 →', onclick: () => TB.settings.open() })
         ])
       );

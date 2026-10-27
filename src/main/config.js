@@ -33,6 +33,21 @@ const DEFAULTS = {
     persona: 'video',
     emotion: true,
     motion: 'full'
+  },
+  voice: {
+    enabled: true,
+    // auto=在线 edge 优先、断网降级离线 Kokoro；kokoro=只用离线；edge=只用在线
+    ttsEngine: 'auto',
+    ttsVoice: 'zh-CN-XiaoyiNeural',
+    // edge 的 pitch 只吃 Hz：正数更亮更少女，负数更沉。范围见设置面板的「音高」
+    ttsPitch: '+3Hz',
+    // 1.0 原速；在线时折算成 rate 百分数（0.9 → -10%），离线时是 Kokoro 的 speed
+    ttsSpeed: 1.0,
+    // 离线 Kokoro 的说话人编号（voices.bin 里的第几个音色）；3 是实测基频最高的女声（≈273Hz）
+    ttsSid: 3,
+    autoSpeak: true,
+    // 识别出最终文本就直接问 AI；想先改字就关掉，那时文字停在输入框
+    autoSend: true
   }
 };
 
@@ -72,7 +87,8 @@ function save(appRoot, config) {
     dockCategories: config.dockCategories,
     dock: config.dock,
     music: config.music,
-    ai: config.ai
+    ai: config.ai,
+    voice: config.voice
   };
   fs.writeFileSync(file, `${JSON.stringify(ordered, null, 2)}\n`, 'utf8');
   return file;

@@ -1,4 +1,5 @@
 node_modules/
+models/
 run.log
 state.json
 samples/
