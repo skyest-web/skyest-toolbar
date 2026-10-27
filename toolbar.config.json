@@ -1,7 +1,7 @@
 {
   "display": {
-    "mode": "auto",
-    "index": 2,
+    "mode": "index",
+    "index": 0,
     "match": {
       "width": 1920,
       "height": 540,
@@ -112,5 +112,15 @@
     "recursive": true,
     "volume": 0.7,
     "repeat": "all"
+  },
+  "ai": {
+    "model": "deepseek-chat",
+    "systemPrompt": "你是常驻在桌面工具栏里的助手，回答尽量简短。",
+    "temperature": 0.6,
+    "maxTokens": 1024,
+    "contextMessages": 12,
+    "timeoutMs": 60000,
+    "firstByteTimeoutMs": 15000,
+    "persistHistory": true
   }
 }

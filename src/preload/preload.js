@@ -57,6 +57,20 @@ contextBridge.exposeInMainWorld('deskToolbar', {
     onUpdate: (handler) => on('clipboard:update', handler)
   },
 
+  ai: {
+    send: (text) => invoke('ai:send', text),
+    retry: () => invoke('ai:retry'),
+    abort: () => invoke('ai:abort'),
+    clear: () => invoke('ai:clear'),
+    keyStatus: () => invoke('ai:key:status'),
+    setKey: (key) => invoke('ai:key:set', key),
+    clearKey: () => invoke('ai:key:clear'),
+    onState: (handler) => on('ai:state', handler),
+    onDelta: (handler) => on('ai:delta', handler),
+    onDone: (handler) => on('ai:done', handler),
+    onError: (handler) => on('ai:error', handler)
+  },
+
   app: {
     quit: () => invoke('app:quit'),
     relaunch: () => invoke('app:relaunch')

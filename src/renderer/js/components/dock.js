@@ -1,6 +1,9 @@
 TB.dock = {
   init(root) {
     root.innerHTML = '';
+    // 重建 shell 后 this.list 是全新空元素，必须让下次 update 重新填充，
+    // 否则 signature 命中缓存、快捷入口会一直空白
+    this.signature = null;
     this.list = TB.util.el('div', { class: 'dock-items' });
     const add = TB.util.el('button', { class: 'dock-add', title: '管理快捷方式（新增 / 编辑 / 删除）', text: '＋', onclick: () => TB.dockEditor.open() });
     root.append(this.list, add);

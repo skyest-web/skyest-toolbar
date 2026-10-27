@@ -11,6 +11,8 @@ const launcher = require('./services/launcher');
 const music = require('./services/music');
 const { Store } = require('./services/store');
 const { ClipboardHistory } = require('./services/clipboard-history');
+const { AiChat } = require('./services/ai');
+const { AiKey } = require('./services/ai-key');
 
 const APP_ROOT = path.resolve(__dirname, '..', '..');
 const COMPONENT_DIR = path.join(APP_ROOT, 'src', 'renderer', 'js', 'components');
@@ -30,6 +32,8 @@ let layout = null;
 let win = null;
 let store = null;
 let clipboardHistory = null;
+let aiKey = null;
+let aiChat = null;
 let placement = null;
 let fastTimer = null;
 let slowTimer = null;
@@ -173,6 +177,7 @@ function registerIpc() {
     notes: store.get('notes'),
     player: store.get('player'),
     clipboard: clipboardHistory.list(),
+    ai: { messages: aiChat.messages, key: aiKey.status() },
     placement,
     displays: displayResolver.list(),
     components: componentFiles(),
@@ -262,6 +267,17 @@ function registerIpc() {
     return true;
   });
 
+  ipcMain.handle('ai:send', (_event, text) => aiChat.send(text));
+  ipcMain.handle('ai:retry', () => aiChat.retry());
+  ipcMain.handle('ai:abort', () => aiChat.abort());
+  ipcMain.handle('ai:clear', () => {
+    aiChat.clear();
+    return true;
+  });
+  ipcMain.handle('ai:key:status', () => aiKey.status());
+  ipcMain.handle('ai:key:set', (_event, key) => aiKey.set(key));
+  ipcMain.handle('ai:key:clear', () => aiKey.clear());
+
   ipcMain.handle('app:quit', () => app.quit());
   ipcMain.handle('app:relaunch', () => {
     app.relaunch();
@@ -279,6 +295,7 @@ function applyPolling() {
     clipboardHistory.enabled = config.clipboard.enabled;
     clipboardHistory.start();
   }
+  if (aiChat) aiChat.syncPersistence();
   startTicker();
 }
 
@@ -299,6 +316,14 @@ if (!gotLock) {
     clipboardHistory = new ClipboardHistory(config.clipboard);
     clipboardHistory.onChange((items) => push('clipboard:update', items));
     clipboardHistory.start();
+
+    aiKey = new AiKey(app.getPath('userData'));
+    aiChat = new AiChat({
+      store,
+      getKey: () => aiKey.get(),
+      getConfig: () => config.ai,
+      emit: push
+    });
 
     registerIpc();
     startTicker();

@@ -1,7 +1,7 @@
 TB.api = window.deskToolbar;
 
 TB.app = {
-  state: { config: null, tasks: [], notes: '', player: null, grid: null, clipboard: [], fast: null, full: null, placement: null, displays: [] },
+  state: { config: null, tasks: [], notes: '', player: null, grid: null, clipboard: [], ai: { messages: [], streaming: null, stream: null, error: null, key: null }, fast: null, full: null, placement: null, displays: [] },
   info: { electron: '', appVersion: '' },
   defaultLayout: null,
   config: null,
@@ -36,6 +36,23 @@ TB.app = {
       this.state.clipboard = items;
       this.refresh('clipboard');
     });
+    TB.api.ai.onState((payload) => {
+      this.state.ai = { ...this.state.ai, messages: payload.messages, streaming: payload.streaming };
+      this.refresh('ai');
+    });
+    TB.api.ai.onDelta((payload) => {
+      const stream = this.state.ai.stream || { text: '', reasoning: '' };
+      this.state.ai = { ...this.state.ai, stream: { text: stream.text + (payload.text || ''), reasoning: stream.reasoning + (payload.reasoning || '') } };
+      this.refresh('ai');
+    });
+    TB.api.ai.onDone(() => {
+      this.state.ai = { ...this.state.ai, stream: null };
+      this.refresh('ai');
+    });
+    TB.api.ai.onError((payload) => {
+      this.state.ai = { ...this.state.ai, stream: null, error: payload };
+      this.refresh('ai');
+    });
     TB.api.displays.onChanged((displays) => {
       this.state.displays = displays;
       this.toast('屏幕布局变化，已重新贴合工具栏屏', 'warn');
@@ -51,6 +68,7 @@ TB.app = {
     if (payload.notes !== undefined) this.state.notes = payload.notes;
     if (payload.player !== undefined) this.state.player = payload.player;
     if (payload.clipboard) this.state.clipboard = payload.clipboard;
+    if (payload.ai) this.state.ai = { ...this.state.ai, ...payload.ai };
     if (payload.placement) this.state.placement = payload.placement;
     if (payload.displays) this.state.displays = payload.displays;
     if (payload.layout) this.state.grid = payload.layout;
@@ -128,6 +146,9 @@ TB.app = {
 
   bindKeys() {
     document.addEventListener('keydown', (event) => {
+      // 输入框里的 Ctrl+, / Ctrl+L 是编辑操作（逗号常见于中文输入与代码），不该被当成打开面板
+      const inField = event.target instanceof Element && event.target.closest('input, textarea, select');
+      if (inField) return;
       if (event.key === ',' && (event.ctrlKey || event.altKey)) {
         event.preventDefault();
         TB.settings.open();

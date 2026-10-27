@@ -56,7 +56,7 @@
     {
       "at": "workbench",
       "label": "中部右上",
-      "module": "workbench",
+      "module": "clipboard",
       "enabled": true
     },
     {
@@ -68,7 +68,7 @@
     {
       "at": "clipboard",
       "label": "右侧竖条",
-      "module": "clipboard",
+      "module": "ai",
       "enabled": true
     },
     {

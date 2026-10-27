@@ -19,7 +19,21 @@ const DEFAULTS = {
   theme: { accent: '#57b6ff' },
   dockCategories: [],
   dock: [],
-  music: { folder: '', recursive: true, volume: 0.7, repeat: 'all' }
+  music: { folder: '', recursive: true, volume: 0.7, repeat: 'all' },
+  ai: {
+    model: 'deepseek-chat',
+    systemPrompt: '你是常驻在桌面工具栏里的助手，回答尽量简短。',
+    temperature: 0.6,
+    maxTokens: 1024,
+    contextMessages: 12,
+    timeoutMs: 60000,
+    firstByteTimeoutMs: 15000,
+    persistHistory: true,
+    name: '小肥鱼',
+    persona: 'video',
+    emotion: true,
+    motion: 'full'
+  }
 };
 
 function isObject(value) {
@@ -57,7 +71,8 @@ function save(appRoot, config) {
     theme: config.theme,
     dockCategories: config.dockCategories,
     dock: config.dock,
-    music: config.music
+    music: config.music,
+    ai: config.ai
   };
   fs.writeFileSync(file, `${JSON.stringify(ordered, null, 2)}\n`, 'utf8');
   return file;

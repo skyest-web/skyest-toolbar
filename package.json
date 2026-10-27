@@ -9,6 +9,7 @@
     "dev": "electron . --dev",
     "displays": "electron ./tools/print-displays.js",
     "diag": "electron ./tools/diagnose.js",
+    "test:ai": "node ./tools/ai-mock-test.js",
     "demo": "node tools/make-demo-audio.js"
   },
   "devDependencies": {
