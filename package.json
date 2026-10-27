@@ -10,9 +10,11 @@
     "displays": "electron ./tools/print-displays.js",
     "diag": "electron ./tools/diagnose.js",
     "test:ai": "node ./tools/ai-mock-test.js",
+    "package": "node ./tools/package.js",
     "demo": "node tools/make-demo-audio.js"
   },
   "devDependencies": {
+    "@electron/packager": "^20.3.0",
     "electron": "^33.3.1"
   }
 }
