@@ -48,6 +48,17 @@ const DEFAULTS = {
     autoSpeak: true,
     // 识别出最终文本就直接问 AI；想先改字就关掉，那时文字停在输入框
     autoSend: true
+  },
+  // DeepSeek Harness（官方 dsh）：双击宠物开它的面板。
+  // 新开顶层段必须同时改这里和 save() 的 ordered 白名单，否则设置一保存就整段消失。
+  dsh: {
+    enabled: true,
+    // dsh 的 sandbox 根 = 子进程 cwd，这个目录等于交给它写
+    workspace: 'dsh-workspace',
+    port: 3080,
+    startupTimeoutMs: 120000,
+    // 官方默认 FEEDBACK_ONLY 会把会话日志发到 deepseeksvc.com，按拍板关掉
+    telemetry: false
   }
 };
 
@@ -88,7 +99,8 @@ function save(appRoot, config) {
     dock: config.dock,
     music: config.music,
     ai: config.ai,
-    voice: config.voice
+    voice: config.voice,
+    dsh: config.dsh
   };
   fs.writeFileSync(file, `${JSON.stringify(ordered, null, 2)}\n`, 'utf8');
   return file;

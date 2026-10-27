@@ -1674,3 +1674,96 @@ input[type='checkbox'] {
   font-size: 0.82rem;
   resize: vertical;
 }
+
+/* DeepSeek Harness 面板：.dsh-body 这块矩形由主进程的 WebContentsView 盖住，
+   所以框、标题、关闭钮都画在框外面，视图只吃内区。 */
+.dsh-panel {
+  position: fixed;
+  left: 18%;
+  right: 18%;
+  top: 5%;
+  bottom: 5%;
+  display: none;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  z-index: 40;
+  overflow: hidden;
+}
+
+.dsh-panel.open {
+  display: flex;
+}
+
+.dsh-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.dsh-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.dsh-badge {
+  font-size: 0.72rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.dsh-badge.ok {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 45%, var(--line));
+}
+
+.dsh-badge.warn {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
+}
+
+.dsh-close {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.dsh-close:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.dsh-body {
+  flex: 1 1 auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.dsh-note {
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.dsh-panel .hidden {
+  display: none;
+}

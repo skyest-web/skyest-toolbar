@@ -14,6 +14,8 @@ const { ClipboardHistory } = require('./services/clipboard-history');
 const { AiChat } = require('./services/ai');
 const { AiKey } = require('./services/ai-key');
 const { Voice } = require('./services/voice');
+const { DshHost } = require('./services/dsh');
+const { DshPanel } = require('./services/dsh-panel');
 
 const APP_ROOT = path.resolve(__dirname, '..', '..');
 const COMPONENT_DIR = path.join(APP_ROOT, 'src', 'renderer', 'js', 'components');
@@ -36,6 +38,8 @@ let clipboardHistory = null;
 let aiKey = null;
 let aiChat = null;
 let voice = null;
+let dsh = null;
+let dshPanel = null;
 let placement = null;
 let fastTimer = null;
 let slowTimer = null;
@@ -303,8 +307,27 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle('app:quit', () => app.quit());
-  ipcMain.handle('app:relaunch', () => {
+  // dsh：状态里不带 token，渲染层只管开合与报尺寸
+  ipcMain.handle('dsh:status', () => dsh.status());
+  ipcMain.handle('dsh:show', async (_event, bounds) => {
+    dshPanel.setBounds(bounds);
+    try {
+      await dshPanel.show();
+      return { ok: true, status: dsh.status() };
+    } catch (error) {
+      return { ok: false, message: error.message || String(error), status: dsh.status() };
+    }
+  });
+  ipcMain.handle('dsh:hide', () => {
+    dshPanel.hide();
+    return true;
+  });
+  ipcMain.handle('dsh:bounds', (_event, bounds) => {
+    dshPanel.setBounds(bounds);
+    return true;
+  });
+
+  ipcMain.handle('app:quit', () => app.quit());  ipcMain.handle('app:relaunch', () => {
     app.relaunch();
     app.quit();
   });
@@ -348,6 +371,10 @@ if (!gotLock) {
     voice = new Voice({ appRoot: APP_ROOT, getConfig: () => config, emit: push });
     voice.sync();
 
+    // dsh 是懒启动的：只有第一次双击宠物开面板才拉子进程
+    dsh = new DshHost({ appRoot: APP_ROOT, getConfig: () => config, getKey: () => aiKey.get(), emit: push });
+    dshPanel = new DshPanel({ win, host: dsh });
+
     aiChat = new AiChat({
       store,
       getKey: () => aiKey.get(),
@@ -366,6 +393,8 @@ if (!gotLock) {
     stopTicker();
     if (clipboardHistory) clipboardHistory.stop();
     if (voice) voice.shutdown();
+    if (dshPanel) dshPanel.destroy();
+    if (dsh) dsh.stop();
     if (store) store.flush();
   });
 

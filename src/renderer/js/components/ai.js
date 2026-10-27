@@ -6,6 +6,9 @@ TB.ai = {
       TB.util.el('span', { class: 'panel-title', text: TB.app.state.config?.ai?.name || 'AI 伙伴' }),
       this.status,
       TB.util.el('button', { class: 'link-btn', text: '清空', title: '清空对话历史', onclick: () => this.clear() }),
+      // 双击宠物让位给了 dsh 面板，打字入口得有个常驻的位置，不然只能靠「开不了麦」兜底
+      TB.util.el('button', { class: 'link-btn', text: '打字', title: '打开打字输入', onclick: () => this.openCompose(true) }),
+      TB.util.el('button', { class: 'link-btn', text: 'Harness', title: '打开 DeepSeek Harness 面板（或直接双击宠物）', onclick: () => TB.dsh.toggle() }),
       // 双击宠物原来是开设置的，现在让位给「双击打字」，设置得有个常驻入口
       TB.util.el('button', { class: 'link-btn', text: '设置', title: '打开 AI 与语音设置', onclick: () => TB.settings.open('ai') })
     ]);
@@ -64,7 +67,7 @@ TB.ai = {
     TB.voice?.init(this);
   },
 
-  // 单击=开麦说话，双击=打字浮层，右键=打断当前回复/朗读。
+  // 单击=开麦说话，双击=DeepSeek Harness 面板，右键=打断当前回复/朗读。
   // 单击延后 260ms 给双击让位（浏览器连发 click/click/dblclick，两次 click 的定时器都会被 dblclick 清掉）
   bindPet() {
     this.petHost.addEventListener('click', () => {
@@ -77,7 +80,7 @@ TB.ai = {
     });
     this.petHost.addEventListener('dblclick', () => {
       clearTimeout(this.tapTimer);
-      this.openCompose(true);
+      TB.dsh.open();
     });
     this.petHost.addEventListener('contextmenu', (event) => {
       event.preventDefault();
@@ -266,7 +269,7 @@ TB.ai = {
       this.list.appendChild(
         TB.util.el('div', { class: 'ai-empty muted' }, [
           ai.key?.set
-            ? TB.util.el('span', { text: '还没有对话。单击宠物说话，双击打字。' })
+            ? TB.util.el('span', { text: '还没有对话。单击宠物说话，点「打字」输入，双击宠物开 Harness 面板。' })
             : TB.util.el('button', { class: 'link-btn', text: '先在设置里填 DeepSeek 密钥 →', onclick: () => TB.settings.open() })
         ])
       );

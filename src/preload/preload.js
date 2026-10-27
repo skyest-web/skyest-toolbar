@@ -71,6 +71,14 @@ contextBridge.exposeInMainWorld('deskToolbar', {
     onError: (handler) => on('ai:error', handler)
   },
 
+  dsh: {
+    status: () => invoke('dsh:status'),
+    show: (bounds) => invoke('dsh:show', bounds),
+    hide: () => invoke('dsh:hide'),
+    setBounds: (bounds) => invoke('dsh:bounds', bounds),
+    onState: (handler) => on('dsh:state', handler)
+  },
+
   app: {
     quit: () => invoke('app:quit'),
     relaunch: () => invoke('app:relaunch')
