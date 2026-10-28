@@ -153,8 +153,8 @@
 | 动作 | 反应 |
 |---|---|
 | 单击宠物 | **开麦说话**（再点一次停）；识别出最终文本按 `voice.autoSend` 决定直接发送还是留在浮层里改。语音没装/被关掉时退回「打开打字浮层」，不会点了没反应。同时本地播一条短反应，不请求 API |
-| 双击宠物 | 打开 **DeepSeek Harness 面板**（官方 `dsh` 的 Web UI 内嵌，见 [docs/dsh-panel.md](file:///C:/SyncData/project/skyest-toolbar/docs/dsh-panel.md)）。打字入口搬到了头部的「打字」按钮，设置入口在头部的「设置」按钮 |
-| 头部「Harness」按钮 | 开/关同一块面板；点面板外、Esc、面板右上 × 都只收起，不退 dsh 子进程 |
+| 双击宠物 | 打开 **DeepSeek Harness 窗口**（官方 `dsh` 的 Web UI，装在独立系统窗口里，能拖到别的屏幕，见 [docs/dsh-panel.md](file:///C:/SyncData/project/skyest-toolbar/docs/dsh-panel.md)）。已经开着就只是把它提到前面并抢焦点。打字入口搬到了头部的「打字」按钮，设置入口在头部的「设置」按钮 |
+| 头部「Harness」按钮 | 开/关同一个窗口；标签实时显示版本与端口，运行中且窗口开着时带 `▣`。窗口右上 × 只收起，不退 dsh 子进程 |
 | 右键宠物 | 打断：停掉正在朗读的话，流式回复中顺带 `abort()` |
 | 流式回复中单击宠物 | 照样开麦（说话本身就会 `stopSpeaking()`），不再像以前那样"不响应" |
 | 悬停宠物 | 轻微跟随视线的眨眼，纯 CSS —— **未实现** |

@@ -1,26 +1,42 @@
-# DeepSeek Harness（dsh）面板
+# DeepSeek Harness（dsh）窗口
 
-把官方开源的 [deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)（命令 `dsh`，包名 `@deepseek-ai/dsh`）的 Web UI 内嵌进工具栏窗口。
-**不是**我们自写的 function-calling 循环——那套 M0–M2 已经整体删除，宠物对话继续走 `src/main/services/ai.js` 的直连流；这块面板是给 dsh 自己的会话界面用的。
+把官方开源的 [deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)（命令 `dsh`，包名 `@deepseek-ai/dsh`）的 Web UI 装进一个**独立的系统窗口**里。
+**不是**我们自写的 function-calling 循环——那套 M0–M2 已经整体删除，宠物对话继续走 `src/main/services/ai.js` 的直连流；这块窗口是给 dsh 自己的会话界面用的。
 
-## 1. 分工：渲染层画框，主进程塞内容
+> 最早它是「贴在工具栏窗口里的一块 `WebContentsView`」。那条路出不了工具栏所在的那块屏——子视图被裁在父窗口的矩形里，拖不动也分不出去。要能挪到别的屏幕上用，只能升成真窗口。
+
+## 1. 分工：渲染层只管开合，主进程管窗口和内容
 
 ```
 双击宠物 / 头部「Harness」按钮
    └─ TB.dsh.open()                     src/renderer/js/dsh.js
-        ├─ 量 .dsh-body 的矩形 → IPC dsh:show
-        └─ DshPanel.show()              src/main/services/dsh-panel.js
+        └─ IPC dsh:show → DshWindow.show()   src/main/services/dsh-window.js
              ├─ DshHost.start()         src/main/services/dsh.js
              │    ├─ spawn(node dsh/lib/bin.js --profile web --no-open --port 3080)
              │    ├─ 从 stdout 认那条 http://127.0.0.1:<port>/?token=…
              │    └─ 拿到 token 才算 ready
+             ├─ new BrowserWindow({ frame: 默认 })   ← 原生标题栏
              └─ new WebContentsView → win.contentView.addChildView → loadURL(带 token 的完整地址)
 ```
 
-**token 不过 IPC。** 带 token 的完整地址只存在于主进程（`DshHost.url`）；`dsh:status` 只回 `{ running, ready, port, installed, workspace, lastError }`。
+**token 不过 IPC。** 带 token 的完整地址只存在于主进程（`DshHost.url`）；`dsh:status` 只回 `{ running, ready, port, installed, workspace, lastError, visible }`。
 dsh 的鉴权就是这一条 URL：访问它 → `303` + `set-cookie: dsh-auth-…`（HttpOnly，30 天），之后没有 token 也能用；没有这条 cookie 的一切请求都是 `401`。
+注意 `lastError`：它是子进程输出尾段截的，而 dsh 会把那条 `dsh web: http://127.0.0.1:<port>/?token=…` 打进 stdout——曾经就这样跟着状态回到渲染层（实测 `npm run dsh:check` 之外，在应用里杀掉 dsh 进程立刻能看见）。现在 `src/main/services/dsh.js` 的 `redact()` 在把它并进 tail 之前就把 token 换成 `…`，取地址走的是未打码的原始 stdout，不受影响。
 
-窗口是无边框的，页面 CSS 像素和 `view.setBounds()` 的 DIP 是同一套坐标，所以渲染层 `getBoundingClientRect()` 报上来的矩形可以直接当视图位置用。
+### 为什么用原生标题栏，不自绘一条
+
+`frame: false` + 自己画拖拽条要额外一个 HTML/CSS/JS 壳、一套 IPC、还得自己处理最大化遮任务栏和跨屏吸附。原生标题栏把这些全交给 Windows：拖动、Win+方向键贴边分屏、最小化到任务栏、混排 DPI 下的正确缩放——这些正是「拖到别的屏幕去用」真正需要的。代价就是那条 32px 标题条跟工具栏风格不搭，而里面装的本来就是 dsh 自己的页面，本来也不是我们的视觉。
+
+连带的好处：窗口本体不需要加载任何页面（`WebContentsView` 铺满整块客户区），所以没有「壳页面」这一层。
+
+### 位置与跨屏
+
+- 窗口移动/缩放时把位置写进 `state.json` 的 `dshWindow`；下次开回上次的屏幕和尺寸。
+  **宽高要按缩放率折算后再存**：这台机器上给构造函数的宽高会被按目标屏的 `scaleFactor` 再乘一遍，而 `getBounds()` 回来的已经是乘过的——直接存回去就是每次重启大一圈（实测 1180 → 1770 → 2656）。`persistBounds()` 除以 `screen.getDisplayMatching(bounds).scaleFactor` 存"归一化尺寸"，取回来刚好抵消。坐标（x/y）不受影响，照存。
+- 最大化/最小化态下不写——那时 `getBounds()` 给的是外扩后的矩形，存下来下次开就"越界"了。
+- 开窗口前校验记忆位置还和某块屏有 ≥120px 重叠，屏幕被拔掉或分辨率变了就回落到系统默认位置。
+- 页面里的 CSS 像素在这台机器上等于物理像素（工具栏那页也一样：dpr 报 2、CSS 1536 = 物理 1536），所以跨屏不需要我们为内容做额外换算；真正要小心的只有上面那条窗口尺寸。
+- 点 × 只是 `hide()`：子进程和已加载的页面都留着，下次开是秒显而不是重走一遍换 cookie。所以窗口关了以后**再双击宠物是把它要回来**（跨屏时一时找不到窗口就用这条），不是重新拉起。
 
 ## 2. 配置段
 
@@ -40,20 +56,22 @@ DeepSeek 密钥沿用原来的纪律：只从 `ai-key.bin`（safeStorage/DPAPI�
 
 | 操作 | 行为 |
 |---|---|
-| 双击宠物 | 打开 Harness 面板 |
-| 头部「Harness」按钮 | 开/关面板（和双击宠物同一条路径） |
-| 面板右上 ×、点面板外 | 关闭（子进程**不**退，下次开秒显）。Esc 只在焦点回到工具栏页面时管用——面板打开后焦点在 dsh 那块视图里 |
+| 双击宠物 | 打开（或唤回）Harness 窗口 |
+| 头部「Harness」按钮 | 同一条路径；按钮文案跟着状态走：`Harness · 启动中…` / `Harness · :3080` / `Harness · 未安装` |
+| 窗口自己的 × | 收起（子进程**不**退，下次开秒显）。窗口能最小化、能拖到别的屏、能 Win+方向键贴边 |
 | 单击宠物 | 还是开麦说话，没变 |
 | 右键宠物 | 还是打断朗读/流式，没变 |
-| 打字输入 | 原来占着「双击」，现在搬到头部的「打字」按钮 |
+| 打字输入 | 头部的「打字」按钮 |
+
+工具栏这边不再有遮罩面板，所以「点外面收起」「Esc 关闭」那两条已经随面板一起删掉了。
 
 ## 4. 生命周期与坑
 
-- **懒启动**：只有第一次开面板才 spawn。`DshHost.start()` 用同一个 in-flight promise 去重，连点不会开出两个服务。实测冷启动 2.9s（自检脚本）/ 3.3s（应用里），面板收起后再开 250ms 左右——因为只撤视图、不退进程。
+- **懒启动**：只有第一次开窗口才 spawn。`DshHost.start()` 用同一个 in-flight promise 去重，连点不会开出两个服务。实测冷启动 2.9s（自检脚本）/ 3.3s（应用里），窗口收起后再开 250ms 左右——因为只藏窗口、不退进程。
 - **用系统 node，不用 Electron 自带的 Node**：`process.execPath` 在打包/`electron .` 下是 `electron.exe`，而 Electron 33 内置的那份 Node（20.18.3）跑 dsh 这个全 ESM 的 CLI 会**静默退 0、一行输出都没有**（实测；`ELECTRON_RUN_AS_NODE=1` 也一样）。所以 `resolveRuntime()` 在 `PATH` 上找 `node.exe`，状态里以 `runtime` 报出来。纯 Node 环境（跑自检脚本时）就直接用 `process.execPath`。
-- **端口占用 / 已有实例**：手动跑过 `npx @deepseek-ai/dsh web` 的话，面板这条路会被端口冲突拖慢——先关掉手工实例，或改 `dsh.port`。
-- **回收**：`before-quit` 里 `DshPanel.destroy()` → `DshHost.stop()`；Windows 上用 `taskkill /T /F` 按进程树收，dsh 自己拉的工作子进程不会留下占着端口的孤儿。
-- **打包**：`@deepseek-ai/dsh` 在 **dependencies**（不是 devDependencies），所以 `npm run package`（`tools/package.js`，`prune: true` 会剪掉 devDependencies）出的成品**带着 dsh**，双击宠物在成品里也能开面板。两个前提：目标机器上要有系统 node（见上），以及产物会大几百 MB。
+- **端口占用 / 已有实例**：手动跑过 `npx @deepseek-ai/dsh web` 的话，开窗口这条路会被端口冲突拖慢——先关掉手工实例，或改 `dsh.port`。
+- **回收**：`before-quit` 里 `DshWindow.destroy()`（先置 `quitting`，让 × 那条「只藏不销」的拦截让路）→ `DshHost.stop()`；Windows 上用 `taskkill /T /F` 按进程树收，dsh 自己拉的工作子进程不会留下占着端口的孤儿。
+- **打包**：`@deepseek-ai/dsh` 在 **dependencies**（不是 devDependencies），所以 `npm run package`（`tools/package.js`，`prune: true` 会剪掉 devDependencies）出的成品**带着 dsh**，双击宠物在成品里也能开窗口。两个前提：目标机器上要有系统 node（见上），以及产物会大几百 MB。
 
 - **dsh 的 web profile 里 `tool-bash` / `tool-pwsh` / `tool-fs` 等默认 `disabled: true`**（证据：`samples/dsh-profile-web.txt`，是 `dsh --profile web --dump-config` 的产物）。想让它真动手，得在 dsh 自己的 profile 里开，不在本项目范围。
 - **npm 拦了 install-scripts**：装 dsh 时 `koffi` / `node-pty` 的编译脚本被 npm 跳过了（`npm warn install-scripts`）。web profile 不需要它们，实测照跑；哪天要开终端类工具再 `npm install-scripts approve`。
@@ -69,7 +87,7 @@ npm install @deepseek-ai/dsh@latest           # 升到最新
 npm install @deepseek-ai/dsh@0.2.1-rc.2       # 出问题时回滚到这一版（写死版本号即可）
 ```
 
-面板右上角的徽标一直显示当前版本号（`v0.2.1-rc.2 · 运行中 :3080`），升级前后看一眼就知道换没换成。
+工具栏头部的「Harness」按钮文案带端口（`Harness · :3080`），它在就说明子进程活着，升级前后看一眼就知道换没换成；dsh 页面自己的版本显示归它管。
 **每次升完必跑**这两条，绿了才算升成功：
 
 ```bash
@@ -87,13 +105,14 @@ node tools/dsh-appprobe.js 9223
 npm run dsh:check                       # 不开界面：拉得起 / 拿得到 token / 退得干净
 # 真机（CDP）：先带调试端口起应用，再跑探针
 ./node_modules/electron/dist/electron.exe . --remote-debugging-port=9223
-node tools/dsh-appprobe.js 9223 --shot  # 接线 + token 不外泄 + 收起不退进程，并出三张图
+node tools/dsh-appprobe.js 9223 --shot  # 接线 + token 不外泄 + 收起不退进程 + 位置记忆落盘，并出两张图
 ```
 
-`dsh-appprobe --shot` 产出：`samples/dsh-frame.png`（我们这页的面板框）、`samples/dsh-view.png`（dsh 视图自己）、`samples/dsh-composite.png`（真实屏幕抓屏，证明视图正好盖在框的内区上）。
-抓屏用 `tools/grab-region.ps1`（ASCII-only，且自己声明 DPI-aware）：Electron 报的是 DIP，抓屏要物理像素，所以原点按主屏缩放率换算、尺寸按本屏缩放率算——他这台机器主屏 1.5x、工具栏屏 1x，不换算就会偏 853px。
+`dsh-appprobe --shot` 产出：`samples/dsh-frame.png`（工具栏这页）。dsh 那页**目前截不到**——它是独立窗口里的 `WebContentsView`，CDP 对它 `Page.captureScreenshot` 两种 `fromSurface` 都会超时（探针把这种情况打印成一行提示，不算失败）。要留跨屏的视觉证据，就用 `tools/grab-region.ps1` 按物理矩形抓屏，或直接看屏幕。
 
-探针全程不打印 token，只打印它的长度；`dsh:status` 的返回里也没有 token 字段。
+跨屏本身怎么验（不需要截图）：从 dsh 那页读 `window.screenX/screenY/devicePixelRatio`，再和 `TB.app.state.displays` 对——落在那块屏的 DIP 坐标上、dpr 等于那块屏的缩放率，就说明窗口真的在别的屏上。这台机器实测：记到 `x=-600, y=-1400` 时 dpr=1.5（屏幕 #1），CSS 宽高 1756×1133。
+
+探针全程不打印 token，只打印它的长度；`dsh:status` 里出现的 `token=` 只可能是主进程 `redact()` 留下的 `token=…`，判定按「等号后还有 6 个以上非空白字符」才算泄。
 
 ## 7. 要改它的界面/功能，走哪条路
 

@@ -73,9 +73,9 @@ contextBridge.exposeInMainWorld('deskToolbar', {
 
   dsh: {
     status: () => invoke('dsh:status'),
-    show: (bounds) => invoke('dsh:show', bounds),
+    show: () => invoke('dsh:show'),
     hide: () => invoke('dsh:hide'),
-    setBounds: (bounds) => invoke('dsh:bounds', bounds),
+    focus: () => invoke('dsh:focus'),
     onState: (handler) => on('dsh:state', handler)
   },
 

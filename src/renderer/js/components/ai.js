@@ -2,14 +2,19 @@ TB.ai = {
   init(root) {
     root.innerHTML = '';
     this.status = TB.util.el('span', { class: 'ai-status', text: '未配置密钥' });
+    // 文案跟着 dsh 状态走：独立窗口的原生标题栏显示不了端口，首次拉起又要几十秒，得有个「启动中」
+    this.dshBtn = TB.util.el('button', {
+      class: 'link-btn',
+      title: '打开 DeepSeek Harness 窗口（独立窗口，能拖到别的屏幕；或直接双击宠物）',
+      onclick: () => TB.dsh.open()
+    });
     this.head = TB.util.el('div', { class: 'ai-head' }, [
       TB.util.el('span', { class: 'panel-title', text: TB.app.state.config?.ai?.name || 'AI 伙伴' }),
       this.status,
       TB.util.el('button', { class: 'link-btn', text: '清空', title: '清空对话历史', onclick: () => this.clear() }),
-      // 双击宠物让位给了 dsh 面板，打字入口得有个常驻的位置，不然只能靠「开不了麦」兜底
+      // 双击宠物是 Harness 窗口，打字入口得有个常驻的位置，不然只能靠「开不了麦」兜底
       TB.util.el('button', { class: 'link-btn', text: '打字', title: '打开打字输入', onclick: () => this.openCompose(true) }),
-      TB.util.el('button', { class: 'link-btn', text: 'Harness', title: '打开 DeepSeek Harness 面板（或直接双击宠物）', onclick: () => TB.dsh.toggle() }),
-      // 双击宠物原来是开设置的，现在让位给「双击打字」，设置得有个常驻入口
+      this.dshBtn,
       TB.util.el('button', { class: 'link-btn', text: '设置', title: '打开 AI 与语音设置', onclick: () => TB.settings.open('ai') })
     ]);
 
@@ -58,6 +63,8 @@ TB.ai = {
     this.petHandle = this.pet.mount(this.petHost, { mood: 'calm', motion: this.motion() });
     this.petShown = { mood: null, talk: null };
     this.bindPet();
+    TB.dsh.subscribe(() => this.syncDsh());
+    this.syncDsh();
     this.stick = true;
     this.bubbleCount = -1;
     TB.api.ai.keyStatus().then((key) => {
@@ -67,7 +74,7 @@ TB.ai = {
     TB.voice?.init(this);
   },
 
-  // 单击=开麦说话，双击=DeepSeek Harness 面板，右键=打断当前回复/朗读。
+  // 单击=开麦说话，双击=DeepSeek Harness 窗口（独立窗口，能拖到别的屏），右键=打断当前回复/朗读。
   // 单击延后 260ms 给双击让位（浏览器连发 click/click/dblclick，两次 click 的定时器都会被 dblclick 清掉）
   bindPet() {
     this.petHost.addEventListener('click', () => {
@@ -87,6 +94,10 @@ TB.ai = {
       TB.voice?.stopSpeaking();
       if (TB.app.state.ai?.streaming) TB.api.ai.abort();
     });
+  },
+
+  syncDsh() {
+    if (this.dshBtn) this.dshBtn.textContent = TB.dsh.label();
   },
 
   openCompose(focus) {
@@ -269,7 +280,7 @@ TB.ai = {
       this.list.appendChild(
         TB.util.el('div', { class: 'ai-empty muted' }, [
           ai.key?.set
-            ? TB.util.el('span', { text: '还没有对话。单击宠物说话，点「打字」输入，双击宠物开 Harness 面板。' })
+            ? TB.util.el('span', { text: '还没有对话。单击宠物说话，点「打字」输入，双击宠物开 Harness 窗口。' })
             : TB.util.el('button', { class: 'link-btn', text: '先在设置里填 DeepSeek 密钥 →', onclick: () => TB.settings.open() })
         ])
       );

@@ -15,7 +15,7 @@ const { AiChat } = require('./services/ai');
 const { AiKey } = require('./services/ai-key');
 const { Voice } = require('./services/voice');
 const { DshHost } = require('./services/dsh');
-const { DshPanel } = require('./services/dsh-panel');
+const { DshWindow } = require('./services/dsh-window');
 
 const APP_ROOT = path.resolve(__dirname, '..', '..');
 const COMPONENT_DIR = path.join(APP_ROOT, 'src', 'renderer', 'js', 'components');
@@ -39,7 +39,7 @@ let aiKey = null;
 let aiChat = null;
 let voice = null;
 let dsh = null;
-let dshPanel = null;
+let dshWindow = null;
 let placement = null;
 let fastTimer = null;
 let slowTimer = null;
@@ -138,6 +138,11 @@ function createWindow() {
 
 function push(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+}
+
+// 给渲染层的 dsh 状态：子进程状态 + 窗口是否开着。这里面不含 token，也不含带 token 的地址。
+function dshStatus() {
+  return { ...(dsh ? dsh.status() : {}), visible: dshWindow ? dshWindow.isOpen() : false };
 }
 
 function startTicker() {
@@ -307,23 +312,22 @@ function registerIpc() {
     }
   });
 
-  // dsh：状态里不带 token，渲染层只管开合与报尺寸
-  ipcMain.handle('dsh:status', () => dsh.status());
-  ipcMain.handle('dsh:show', async (_event, bounds) => {
-    dshPanel.setBounds(bounds);
+  // dsh：状态里不带 token，渲染层只管开合。窗口是独立系统窗口，尺寸归 Windows 管，不再报 bounds
+  ipcMain.handle('dsh:status', () => dshStatus());
+  ipcMain.handle('dsh:show', async () => {
     try {
-      await dshPanel.show();
-      return { ok: true, status: dsh.status() };
+      await dshWindow.show();
+      return { ok: true, status: dshStatus() };
     } catch (error) {
-      return { ok: false, message: error.message || String(error), status: dsh.status() };
+      return { ok: false, message: error.message || String(error), status: dshStatus() };
     }
   });
   ipcMain.handle('dsh:hide', () => {
-    dshPanel.hide();
+    dshWindow.hide();
     return true;
   });
-  ipcMain.handle('dsh:bounds', (_event, bounds) => {
-    dshPanel.setBounds(bounds);
+  ipcMain.handle('dsh:focus', () => {
+    dshWindow.focus();
     return true;
   });
 
@@ -371,9 +375,19 @@ if (!gotLock) {
     voice = new Voice({ appRoot: APP_ROOT, getConfig: () => config, emit: push });
     voice.sync();
 
-    // dsh 是懒启动的：只有第一次双击宠物开面板才拉子进程
-    dsh = new DshHost({ appRoot: APP_ROOT, getConfig: () => config, getKey: () => aiKey.get(), emit: push });
-    dshPanel = new DshPanel({ win, host: dsh });
+    // dsh 是懒启动的：只有第一次双击宠物开窗口才拉子进程
+    // dsh 自己只报子进程状态，窗口开合由 dshStatus 补齐，省得渲染层看到两种形状的状态对象
+    dsh = new DshHost({
+      appRoot: APP_ROOT,
+      getConfig: () => config,
+      getKey: () => aiKey.get(),
+      emit: (channel, payload) => push(channel, channel === 'dsh:state' ? dshStatus() : payload)
+    });
+    dshWindow = new DshWindow({
+      host: dsh,
+      store,
+      onVisibility: () => push('dsh:state', dshStatus())
+    });
 
     aiChat = new AiChat({
       store,
@@ -393,7 +407,7 @@ if (!gotLock) {
     stopTicker();
     if (clipboardHistory) clipboardHistory.stop();
     if (voice) voice.shutdown();
-    if (dshPanel) dshPanel.destroy();
+    if (dshWindow) dshWindow.destroy();
     if (dsh) dsh.stop();
     if (store) store.flush();
   });

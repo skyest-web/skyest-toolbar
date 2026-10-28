@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const EMPTY = { tasks: [], notes: '', player: null, aiChat: [] };
+const EMPTY = { tasks: [], notes: '', player: null, aiChat: [], dshWindow: null };
 
 class Store {
   constructor(dir) {

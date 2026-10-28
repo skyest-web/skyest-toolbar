@@ -9,7 +9,7 @@
 | 整体布局与快速开始 | [README.md](README.md) |
 | AI 对话 + 桌宠（含手势表） | [docs/ai-pet-panel.md](docs/ai-pet-panel.md) |
 | 语音链路（ASR/TTS） | [docs/voice-module.md](docs/voice-module.md) |
-| DeepSeek Harness（dsh）面板 | [docs/dsh-panel.md](docs/dsh-panel.md) |
+| DeepSeek Harness（dsh）窗口 | [docs/dsh-panel.md](docs/dsh-panel.md) |
 | 企业微信通知组件 | [docs/wxwork-notify-module.md](docs/wxwork-notify-module.md) |
 
 ## 硬纪律（违反等于回归失败）
@@ -24,7 +24,7 @@
 |---|---|
 | 主进程 AI/流式 | `npm run test:ai`（零依赖 mock，37 项） |
 | dsh 子进程 | `npm run dsh:check` |
-| 界面/手势/内嵌视图 | 带 `--remote-debugging-port=9223` 起应用，再 `node tools/dsh-appprobe.js 9223 --shot` 或 `node tools/voice-appprobe.js 9223 --shot` |
+| 界面/手势/dsh 窗口 | 带 `--remote-debugging-port=9223` 起应用，再 `node tools/dsh-appprobe.js 9223 --shot` 或 `node tools/voice-appprobe.js 9223 --shot` |
 
 真机验证的规矩：**别用假数据自证**，CDP 驱动真实运行的应用；起应用前 `unset ELECTRON_RUN_AS_NODE`；这仓库有单实例锁，附着前确认没连到上一份旧实例。
 
@@ -33,8 +33,11 @@
 - `src/main/config.js` 新增顶层配置段，必须**同时**改 `DEFAULTS` 和 `save()` 里的 `ordered` 白名单，否则设置一保存整段消失。
 - Electron 33 自带的 Node（20.18）跑不了 dsh 那个全 ESM 的 CLI，会静默退 0、零输出；dsh 用 PATH 上的系统 node 起。
 - `.ps1` 一律 **ASCII-only**（Windows PowerShell 5.1 读无 BOM 的 UTF-8 会解析炸），中文另存 UTF-8 数据文件；别在 bash 里内联 `powershell -Command`。
-- 桌宠手势：**双击 = dsh 面板**，打字入口在 AI 头部的「打字」按钮（历史上双击曾是打字、再往前是跳设置，别按旧文档改回去）。
+- 桌宠手势：**双击 = dsh 窗口**，打字入口在 AI 头部的「打字」按钮（历史上双击曾是打字、再往前是跳设置，别按旧文档改回去）。
 - 副屏窗口尺寸只能在 `setBounds` 里落定，构造函数里传 width/height 会被主屏截断（`createWindow` 有注释）。
+- dsh 窗口的记忆尺寸要**除以所在屏的 `scaleFactor` 再存**：这台机器上给构造函数的宽高会被按目标屏缩放率再乘一遍，而 `getBounds()` 已经是乘过的，照存就是每次重启大一圈（实测 1180→1770→2656）。见 `dsh-window.js` 的 `persistBounds()`。
+- dsh 把带 token 的访问地址打进 stdout，而 `lastError` 是输出尾段截的——不打码就会跟着 `dsh:status` 进渲染层（`dsh.js` 的 `redact()` 负责这件事，别把它当装饰删掉）。
+- 重启开发实例做验证：用 CDP 跑 `TB.api.app.quit()`（渲染层还在时），别 `taskkill` 不带 `/F`——那只关工具栏窗口；dsh 窗口是另一个顶层窗口，`window-all-closed` 不触发，应用会留在没窗口的状态，而 dsh 子进程也不会被收。
 
 ## 换到新机器要做什么
 
@@ -44,7 +47,7 @@ npm run voice:install # 语音模型不在 git 里（models/ 被 ignore）
 npm start
 ```
 
-然后：设置里重填 DeepSeek 密钥（旧密钥不跟仓库走）；`toolbar.config.json` 里 `music.folder`、`display` 定位按新机器的屏幕改；dsh 面板要求机器上有系统 node；端口 3080 被占就改 `dsh.port`。
+然后：设置里重填 DeepSeek 密钥（旧密钥不跟仓库走）；`toolbar.config.json` 里 `music.folder`、`display` 定位按新机器的屏幕改；dsh 窗口要求机器上有系统 node；端口 3080 被占就改 `dsh.port`。
 
 ## dsh 是外部可升级件
 

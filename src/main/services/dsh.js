@@ -11,6 +11,13 @@ const { spawn } = require('node:child_process');
 const URL_PATTERN = /https?:\/\/[^\s"'<>]+/;
 // dsh 的输出带颜色：ANSI 转义会紧贴着 URL 尾巴，不洗掉直接拿去 loadURL 就是个坏地址
 const ANSI_PATTERN = /\u001b\[[0-9;]*m/g;
+// 尾段（tail）会被拼进 lastError，lastError 又进 status、回渲染层、进日志——所以先把 token 打码。
+// 拿地址走的是 takeUrl()，它看的是原始 stdout，不受这里影响。
+const TOKEN_PATTERN = /([?&]token=)[^\s"'&<>]+/g;
+
+function redact(text) {
+  return String(text).replace(TOKEN_PATTERN, '$1…');
+}
 
 // 装了就有 { bin, version }，没装返回 null。version 是要回给界面看的：
 // dsh 保持可升级（^0.2.1-rc.x），所以「现在跑的是哪一版」得随时看得见，坏了才知道回滚到哪。
@@ -151,7 +158,7 @@ class DshHost {
 
     child.stdout.on('data', (chunk) => this.onStdout(String(chunk)));
     child.stderr.on('data', (chunk) => {
-      this.tail = (this.tail + String(chunk)).slice(-4000);
+      this.tail = (this.tail + redact(String(chunk))).slice(-4000);
     });
     child.on('exit', (code, signal) => {
       this.child = null;
@@ -186,7 +193,7 @@ class DshHost {
     this.stdoutBuf = lines.pop();
     for (const raw of lines) {
       const line = raw.replace(ANSI_PATTERN, '');
-      this.tail = (this.tail + line + '\n').slice(-4000);
+      this.tail = (this.tail + redact(line) + '\n').slice(-4000);
       this.takeUrl(line);
     }
     // 万一它打完地址不再换行，只要地址后面跟了别的字符（色码、空格）也算收全了

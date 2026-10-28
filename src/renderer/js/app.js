@@ -15,7 +15,7 @@ TB.app = {
     TB.settings.init(this.nodes.settings);
     TB.dockEditor.init(this.nodes.dockEditor);
     TB.layoutEditor.init(this.nodes.layoutEditor);
-    TB.dsh.init(document.getElementById('dsh-panel'));
+    TB.dsh.init();
     this.bindKeys();
 
     const info = await TB.api.boot();
