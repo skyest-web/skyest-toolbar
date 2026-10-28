@@ -32,7 +32,10 @@ const DEFAULTS = {
     name: '小肥鱼',
     persona: 'video',
     emotion: true,
-    motion: 'full'
+    motion: 'full',
+    // 让它能调本机工具（目前只有只读的 search_files）。默认关：开了就意味着本机文件路径
+    // 会作为模型输入发到 DeepSeek，而且它说话开始依赖一台机器上的索引。
+    agentTools: { enabled: false }
   },
   voice: {
     enabled: true,

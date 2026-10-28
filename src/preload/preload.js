@@ -68,6 +68,7 @@ contextBridge.exposeInMainWorld('deskToolbar', {
     onState: (handler) => on('ai:state', handler),
     onDelta: (handler) => on('ai:delta', handler),
     onDone: (handler) => on('ai:done', handler),
+    onTool: (handler) => on('ai:tool', handler),
     onError: (handler) => on('ai:error', handler)
   },
 

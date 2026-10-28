@@ -1,7 +1,7 @@
 {
   "display": {
     "mode": "index",
-    "index": 0,
+    "index": 1,
     "match": {
       "width": 1920,
       "height": 540,
@@ -125,7 +125,10 @@
     "name": "小肥鱼",
     "persona": "video",
     "emotion": true,
-    "motion": "full"
+    "motion": "full",
+    "agentTools": {
+      "enabled": true
+    }
   },
   "voice": {
     "enabled": true,

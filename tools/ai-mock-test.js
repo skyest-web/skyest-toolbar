@@ -14,7 +14,7 @@ function makeStore() {
   };
 }
 
-function harness({ key = 'sk-test', config = {}, store = makeStore() } = {}) {
+function harness({ key = 'sk-test', config = {}, store = makeStore(), tools = null } = {}) {
   const events = [];
   const ai = new AiChat({
     store,
@@ -31,9 +31,40 @@ function harness({ key = 'sk-test', config = {}, store = makeStore() } = {}) {
       ...config
     }),
     emit: (channel, payload) => events.push({ channel, payload }),
+    getTools: tools ? () => tools : null,
     endpoint: `http://127.0.0.1:${server.address().port}/chat`
   });
   return { ai, events, store };
+}
+
+// 每一次 /chat 请求的原始 body 都留一份，工具轮次的断言全靠回看它
+const requestLog = [];
+
+function sse(res, objects) {
+  res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+  const frames = objects.map((obj) => `data: ${JSON.stringify(obj)}\n\n`);
+  frames.push('data: [DONE]\n\n');
+  let cursor = 0;
+  const tick = setInterval(() => {
+    if (cursor >= frames.length) return clearInterval(tick);
+    res.write(frames[cursor++]);
+  }, 3);
+  res.on('close', () => clearInterval(tick));
+}
+
+// tool_calls 的 arguments 在真实流里就是被切成很多片送来的，这里照它的样子拆开发，
+// 拼不回去就是非法 JSON —— 那是这条链路上最容易错的地方。
+function toolCallFrame(frag) {
+  return { choices: [{ delta: { tool_calls: [frag] } }] };
+}
+
+function toolCallFrames(id, name, argChunks) {
+  return [
+    { choices: [{ delta: { role: 'assistant', content: '让我' } }] },
+    toolCallFrame({ index: 0, id, function: { name, arguments: argChunks[0] } }),
+    ...argChunks.slice(1).map((chunk) => toolCallFrame({ index: 0, function: { arguments: chunk } })),
+    { choices: [{ delta: {}, finish_reason: 'tool_calls' }] }
+  ];
 }
 
 const server = http.createServer((req, res) => {
@@ -41,7 +72,47 @@ const server = http.createServer((req, res) => {
   req.on('data', (chunk) => (body += chunk));
   req.on('end', () => {
     const payload = JSON.parse(body);
-    const prompt = payload.messages[payload.messages.length - 1].content;
+    requestLog.push(payload);
+    const last = payload.messages[payload.messages.length - 1];
+    const prompt = last.content;
+    // 认最后一条 user，而不是"历史里出现过"：工具轮次不落盘，但用户下一句真的还会再提这个词
+    const asked = (marker) => payload.messages.filter((m) => m.role === 'user').at(-1)?.content === marker;
+
+    // 工具轮：第一轮点 search_files，收到 role:'tool' 的结果才把观察到的东西回吐给测试
+    if (asked('TOOLCALL')) {
+      if (last.role !== 'tool') {
+        sse(res, toolCallFrames('call_a1', 'search_files', ['{"qu', 'ery": "everyth', 'ing.exe"}']));
+        return;
+      }
+      const prev = payload.messages[payload.messages.length - 2];
+      sse(res, [
+        {
+          choices: [
+            {
+              delta: {
+                content: JSON.stringify({
+                  gotTools: Array.isArray(payload.tools) && payload.tools.map((t) => t.function.name),
+                  toolChoice: payload.tool_choice,
+                  toolRole: last.role,
+                  toolName: last.name,
+                  toolCallId: last.tool_call_id,
+                  prevHadCalls: Array.isArray(prev?.tool_calls) ? prev.tool_calls.map((c) => [c.id, c.function.name]) : null,
+                  prevContent: prev?.content,
+                  resultHead: String(last.content).slice(0, 8)
+                })
+              }
+            }
+          ]
+        }
+      ]);
+      return;
+    }
+
+    // 无赖轮：永远在要工具（服务端行为异常时的样子），验轮次上限这道硬闸
+    if (asked('TOOLLOOP')) {
+      sse(res, toolCallFrames(`call_${requestLog.length}`, 'search_files', ['{"query": "x"}']));
+      return;
+    }
 
     if (prompt === 'TRIGGER_401') {
       res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -96,6 +167,27 @@ const server = http.createServer((req, res) => {
     res.on('close', () => clearInterval(tick));
   });
 });
+
+// 假的「查本机文件」工具：形状和 src/main/services/ai-tools.js 里那个真的一致
+// （name / label / schema / run），而且故意在结果里放一条绝对路径，好验它不落盘。
+function fakeTool(onRun) {
+  return {
+    name: 'search_files',
+    label: (query) => `查了本机文件索引「${query}」`,
+    schema: {
+      type: 'function',
+      function: {
+        name: 'search_files',
+        description: '按文件名关键字查本机索引',
+        parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'], additionalProperties: false }
+      }
+    },
+    async run(args) {
+      onRun?.(args);
+      return { text: '1. everything.exe｜2.2MB\n   D:\\SecretPlace\\everything.exe', count: 3 };
+    }
+  };
+}
 
 const results = [];
 const check = (name, pass, detail = '') => results.push({ name, pass, detail });
@@ -270,6 +362,75 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     await ai.send('x'.repeat(20000));
     const longUser = ai.messages.filter((m) => m.role === 'user').at(-1);
     check('I2 超长输入被截断', longUser.content.length === 8000, `len=${longUser.content.length}`);
+  }
+
+  // L. 工具调用（function calling）：宠物能查本机文件索引，但工具轮次不落盘
+  {
+    const calls = [];
+    const tool = fakeTool((args) => calls.push(args));
+    const { ai, events, store } = harness({ tools: [tool] });
+    const before = requestLog.length;
+    await ai.send('TOOLCALL');
+    const rounds = requestLog.slice(before);
+    const finalText = ai.messages.at(-1)?.content || '';
+    let obs = null;
+    try {
+      obs = JSON.parse(finalText.slice(finalText.indexOf('\n') + 1));
+    } catch {
+      obs = null;
+    }
+    check('L1 两轮拼成一条回答，中间有分隔', Boolean(obs) && finalText.startsWith('让我\n'), JSON.stringify(finalText));
+    check('L2 第一轮请求带了 tools 定义', rounds[0]?.tools?.[0]?.function?.name === 'search_files', JSON.stringify(rounds[0]?.tools?.map((t) => t.function.name)));
+    check('L3 tool_choice=auto', rounds[0]?.tool_choice === 'auto', String(rounds[0]?.tool_choice));
+    check('L4 分片的 arguments 拼回合法 JSON 才交给工具', calls.length === 1 && calls[0].query === 'everything.exe', JSON.stringify(calls));
+    check('L5 assistant 的 tool_calls 原样回传', JSON.stringify(obs?.prevHadCalls) === JSON.stringify([['call_a1', 'search_files']]), JSON.stringify(obs?.prevHadCalls));
+    check('L6 工具结果以 role:tool 回传', obs?.toolRole === 'tool' && obs?.toolCallId === 'call_a1' && obs?.resultHead === '1. every', JSON.stringify(obs));
+    check('L7 前一轮的口播留在上下文里', obs?.prevContent === '让我', JSON.stringify(obs?.prevContent));
+    check('L8 历史里只有 user + 最终 assistant', ai.messages.length === 2 && ai.messages[1].role === 'assistant', JSON.stringify(ai.messages.map((m) => m.role)));
+    check('L9 工具轮次与文件路径不落盘', !JSON.stringify(store.state.aiChat).includes('SecretPlace') && store.state.aiChat.length === 2, JSON.stringify(store.state.aiChat.map((m) => m.role)));
+    const toolEvent = events.find((e) => e.channel === 'ai:tool');
+    check('L10 给渲染层发了 ai:tool（带文案与条数）', toolEvent?.payload?.count === 3 && toolEvent?.payload?.label === '查了本机文件索引「everything.exe」', JSON.stringify(toolEvent?.payload));
+  }
+  {
+    const before = requestLog.length;
+    const { ai } = harness();
+    await ai.send('你好');
+    check('L11 不接工具时请求体和以前一样（无 tools 字段）', requestLog.slice(before).every((p) => p.tools === undefined && p.tool_choice === undefined));
+  }
+  {
+    const before = requestLog.length;
+    const { ai } = harness({ config: { model: 'deepseek-reasoner' }, tools: [fakeTool()] });
+    await ai.send('你好');
+    check('L12 reasoner 不支持 function calling，开着也不给 tools', requestLog.slice(before).at(-1)?.tools === undefined, JSON.stringify(requestLog.slice(before).at(-1)?.tools));
+  }
+  {
+    let runs = 0;
+    const looping = { ...fakeTool(), run: async () => (runs += 1, { text: '还在查', count: 0 }) };
+    const before = requestLog.length;
+    const { ai } = harness({ tools: [looping] });
+    await ai.send('TOOLLOOP');
+    const rounds = requestLog.slice(before);
+    check('L13 模型一直要工具也在三轮请求内收住', rounds.length === 3 && runs === 2, `${rounds.length} 轮请求 / 执行 ${runs} 次`);
+    check('L13b 最后一轮不再带 tools（逼它用文字收尾）', rounds.at(-1)?.tools === undefined, JSON.stringify(rounds.at(-1)?.tools));
+    check('L13c 到点就停，不是死循环', ai.messages.at(-1)?.role === 'assistant');
+  }
+  {
+    const { ai } = harness({ tools: [fakeTool()] });
+    await ai.send('TOOLCALL');
+    const before = requestLog.length;
+    await ai.send('再来一句');
+    const messages = requestLog.slice(before).at(-1)?.messages || [];
+    check('L14 下一轮对话的上下文里没有上次的工具轮次', messages.every((m) => m.role !== 'tool'), JSON.stringify(messages.map((m) => m.role)));
+  }
+  // 用户那句话只能出现一遍：send() 先取上下文再写历史，反过来的话请求里会带上两遍
+  {
+    const { ai } = harness();
+    await ai.send('第一句');
+    const first = requestLog.at(-1)?.messages || [];
+    check('L15 请求里用户那句话只出现一遍', first.filter((m) => m.role === 'user').length === 1 && first.at(-1)?.content === '第一句', JSON.stringify(first.map((m) => m.role)));
+    await ai.send('第二句');
+    const second = requestLog.at(-1)?.messages || [];
+    check('L15b 多轮上下文顺序对且不重复', JSON.stringify(second.map((m) => m.role)) === '["system","user","assistant","user"]', JSON.stringify(second.map((m) => m.role)));
   }
 
   server.close();

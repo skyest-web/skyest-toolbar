@@ -34,7 +34,7 @@
 ## 4. 链路
 
 ```
-单击宠物（或浮层里的麦克风）
+点浮层里的麦克风（单击宠物只浮出输入条，不开麦）
   renderer getUserMedia(48k mono) ──每 100ms Float32──▶ main voice.js ──▶ worker
                                                                     │ LinearResampler 48k→16k
                                                                     │ OnlineRecognizer 流式解码
@@ -71,7 +71,7 @@
 改动
 - [src/main/main.js](../src/main/main.js) — `voice:*` IPC、`boot:get` 带语音状态、`before-quit` 收子进程
 - [src/preload/preload.js](../src/preload/preload.js) — `voice` 桥
-- [src/renderer/js/components/ai.js](../src/renderer/js/components/ai.js) — 暴露 `compose`（打字/录音时浮出的对话条，原来是常驻 `.ai-foot`）供插麦克风按钮、`talking` 改读发声状态、单击宠物=开麦
+- [src/renderer/js/components/ai.js](../src/renderer/js/components/ai.js) — 暴露 `compose`（打字/录音时浮出的对话条，原来是常驻 `.ai-foot`）供插麦克风按钮、`talking` 改读发声状态、单击宠物=浮出这条（不开麦；录音中再单击=停麦）
 - [src/renderer/js/settings.js](../src/renderer/js/settings.js) — 「语音」卡片：总开关、引擎、在线音色、音高、离线 sid、语速、自动朗读、说完即发送、试听、模型状态。「试听」把面板上**还没保存**的值当临时覆盖传下去，改一项立刻听
 - [src/main/config.js](../src/main/config.js)、[src/renderer/styles.css](../src/renderer/styles.css)、[src/renderer/index.html](../src/renderer/index.html)、[package.json](../package.json)
 
@@ -136,10 +136,11 @@ appprobe 把 `test_wavs/0.wav` 冒充 16k 麦克风灌进去，检查 worker 状
  "configVoiceKeys":["autoSend","autoSpeak","enabled","ttsEngine","ttsPitch","ttsSid","ttsSpeed","ttsVoice"],
  "composeOpenAtStart":false,"micInCompose":true,"composeOpens":true,"composeFocusesInput":true,
  "staysOpenWhileRecording":true,"staysOpenWithDraft":true,"composeClosesWhenEmpty":true,
- "clickFallsBackToCompose":true,"dblclickOpensCompose":true,"rightClickNoThrow":true,"composeClosedAtEnd":true}
+ "tapGone":true,"clickOpensCompose":true,"clickOpensComposeWithoutVoice":true,"clickStartsRecording":false,
+ "dblclickKeepsComposeClosed":true,"rightClickNoThrow":true,"composeClosedAtEnd":true}
 ```
 
-`autoSendSubmits` 非空 = 开关打开时 final 真把 `submit()` 叫了起来；`autoSendOffKeepsDraft` = 关掉时文字留在输入框且拿到焦点。`autoSpeak*` 是伪造一条 assistant 回复跑「ai:done→自动朗读」，`--with-ai` 再用真 DeepSeek 往返跑同一段（会往对话历史里留消息，验完清 `state.json` 的 `aiChat`）。`voiceCardFields`/`configVoiceKeys` 是防呆：`config.voice` 里每个键都得在设置卡片有对应控件，否则设置一保存就静默丢键（`autoSend` 差点栽过一次）。最后一段 `compose*` 验对话浮层：默认收起、录音中/有草稿不许收、单击宠物在语音不可用时退回打字、双击开浮层、右键打断——这一段全程不碰真麦克风（把 `asrReady` 临时判死来走退路），所以**真麦克风采音仍然要他本人现场点一次**。
+`autoSendSubmits` 非空 = 开关打开时 final 真把 `submit()` 叫了起来；`autoSendOffKeepsDraft` = 关掉时文字留在输入框且拿到焦点。`autoSpeak*` 是伪造一条 assistant 回复跑「ai:done→自动朗读」，`--with-ai` 再用真 DeepSeek 往返跑同一段（会往对话历史里留消息，验完清 `state.json` 的 `aiChat`）。`voiceCardFields`/`configVoiceKeys` 是防呆：`config.voice` 里每个键都得在设置卡片有对应控件，否则设置一保存就静默丢键（`autoSend` 差点栽过一次）。最后一段 `compose*` 验对话浮层：默认收起、录音中/有草稿不许收、**单击宠物只浮出输入条且绝不开麦**（`clickStartsRecording:false` 是关键判据：语音可用时点宠物也不许起录音，打还是说由他自己点麦克风决定）、双击不动浮层（它开的是 Harness 窗口）、右键打断——这一段全程不碰真麦克风（`asrReady` 临时改判、`startRecord` 换成计数器，测完还原），所以**真麦克风采音仍然要他本人现场点一次**。
 
 加 `--shot` 会另外截两张真实画面到 `samples/ui-compose-{closed,open}.png`，改布局时用肉眼核对浮层位置和遮挡。
 

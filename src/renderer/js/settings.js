@@ -148,6 +148,7 @@ TB.settings = {
       config.ai.persona
     );
     const aiEmotion = this.checkbox(config.ai.emotion);
+    const aiAgentTools = this.checkbox(config.ai.agentTools?.enabled);
     const aiMotion = this.select(
       [
         ['full', '完整'],
@@ -225,6 +226,11 @@ TB.settings = {
       this.field('名字', aiName, '会写进系统提示，它就知道别人怎么叫它；面板标题也用这个'),
       this.field('宠物形象', aiPersona, '换形象即时生效，不用重启'),
       this.field('情绪标签', aiEmotion, '让它每句话开头带 [开心]/[困] 这类标签，宠物据此换表情；关掉省一点 token'),
+      this.field(
+        '查本机文件',
+        aiAgentTools,
+        '开着时它能按文件名查本机索引（Everything）来回答「X 在哪」。只读，打不开文件；工具拿到的原始结果不落盘，但命中的文件名和路径会作为输入发到 DeepSeek。需要「文件搜索」是开的，且模型是 deepseek-chat（reasoner 不支持工具）'
+      ),
       this.field('宠物动画', aiMotion, '只有「关闭」真省 CPU：视频版常驻约 23% 单核，关闭后 3%')
     );
     aiCard.dataset.card = 'ai';
@@ -419,6 +425,7 @@ TB.settings = {
               name: aiName.value.trim().slice(0, 20),
               persona: aiPersona.value,
               emotion: aiEmotion.checked,
+              agentTools: { ...config.ai.agentTools, enabled: aiAgentTools.checked },
               motion: aiMotion.value
             };
             config.voice = {

@@ -37,6 +37,7 @@ grid.areas：4 列 × 4 行（左列 330px · 中间两列各 1fr · 右列 400p
 - **剪贴板历史**：只存在内存，退出即清空，密码类内容不会落盘。点击条目重新复制。
 - **分类导航**：dock 按 `category` 聚成分类，每个分类平时是一条窄标签；点某个分类，它原地向右展宽铺开该分类的条目，其他分类同时收回（同 Element-UI `el-collapse` 的 `accordion`，方向从左到右），见下面「分类导航」。行尾的 ＋ 打开表单式管理面板，增删改入口和分类都不用手写 JSON。
 - **音乐播放器**：扫描 `music.folder`（含子目录，最深 4 层）里的 mp3 / flac / m4a / wav / ogg / opus / wma，文件名按 `序号 - 歌手 - 曲名` 自动拆分；同名同目录的 `.lrc` 会同步滚动高亮；底部频谱用 WebAudio `AnalyserNode` 实时绘制。空格键播放 / 暂停；当前曲目、进度、音量、循环与随机方式记在 `state.json`。换曲库不用进设置：播放器标题栏右侧的 📁 会弹原生文件夹选择框，选完写回 `toolbar.config.json` 并立刻重扫。宽度 ≤420px 时（现在的左列）走 CSS 容器查询的紧凑版：控制键与音量分两行、曲库占满宽、歌词压成一行字幕、频谱降到 22px。
+- **桌宠对话**：右列那只小女仆是 DeepSeek 对话（`deepseek-chat` / `deepseek-reasoner`，密钥只活在主进程内存与 `ai-key.bin`）。设置「AI 对话」卡片里可以开「查本机文件」：开着时它能按文件名查本机 Everything 索引来回答「X 在哪」，只读、打不开文件，命中的名字和路径会作为输入发到 DeepSeek，工具那几轮原始结果不落盘（默认关；要模型是 `deepseek-chat`，reasoner 不支持工具）。详见 [docs/ai-chat-module.md](docs/ai-chat-module.md) §13。
 
 ## 组件与位置
 
@@ -189,6 +190,7 @@ $lnk.Save()
 - **某个位置空着**：多半是 `slots.module` 指向了一个不存在的组件（改名、删文件），`layout.json` 里把它换掉或取消「显示」即可；控制台有 `[layout] 位置 "xxx" 引用的组件 "yyy" 不存在`。
 - **`npm run diag` 只截到壁纸**：Windows 的 DXGI 屏幕复制对某些副屏（尤其 USB 便携屏）会报 `Cannot initialize any DxgiOutputDuplicator instance`，此时 `desktopCapturer` 拿到的是没有窗口内容的桌面。要核对界面本身，用 DevTools 里 `capturePage` 或直接看那块屏。
 - **顶栏没有搜索栏**：设置里「文件搜索（Everything）」的「启用」被关了（`search.enabled=false` 时整条搜索栏不渲染，Ctrl+F 跟着失效），或这台机器不是 Windows。徽标显示「未连接」是 Everything 没在跑，点同一张卡片里的「重连并拉起 Everything」。
+- **宠物不查本机文件**：三个条件缺一个就不挂工具——设置里「查本机文件」没开（`ai.agentTools.enabled`）、「文件搜索」被关了（`search.enabled`）、模型不是 `deepseek-chat`（reasoner 不支持 function calling）。都开着但它还是不查，多半是这个问题历史里答过，它照抄上一轮；换个没问过的文件名即可。
 - 主进程日志（目标屏、窗口尺寸）在终端里；渲染层日志需要 `npm run dev` 看 DevTools。
 
 ## 目录

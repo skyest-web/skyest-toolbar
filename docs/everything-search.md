@@ -60,6 +60,7 @@ Everything 是便携模式：**ini 和 db 都落在 exe 旁边**，不写注册�
 - **「打开」不接渲染层给的路径**。`search:open` 只接 `(listId, 序号)`，路径从主进程缓存的最近 8 页结果里取（`LIST_LIMIT`）。这条 IPC 不是"你给我路径我帮你 openPath"的口子。
 - **状态里不带结果**：`search:state` 推的是连接信息（版本、在不在跑、索引好没好），没有文件路径。
 - 结果路径会显示在面板上，这是功能本身要的；但它不进日志、不进 `state.json`。
+- **宠物（AI 对话）是第二个消费者，只拿「查」不拿「开」**：[src/main/services/ai-tools.js](../src/main/services/ai-tools.js) 的 `search_files` 在主进程里直接调 `EverythingSearch.search()`（同进程，不经 IPC），命中的文件名和路径会作为模型输入发给 DeepSeek，那份原始结果不落盘（默认关，开关是 `ai.agentTools.enabled`，见 [docs/ai-chat-module.md](ai-chat-module.md) §13）。`search:open` 不暴露给它：那条的入参是 `(listId, 序号)`，模型只要能自己拼出这俩数字，就等于让它替你双击了一个文件。
 
 ## 5. 配置段
 
@@ -88,6 +89,7 @@ npm run everything:check -- --start   # Everything 没在跑时，用便携版�
 # 真机（CDP）：先带调试端口起应用，再跑探针
 ./node_modules/electron/dist/electron.exe . --remote-debugging-port=9223
 npm run search:appprobe -- --shot     # 等价于 node tools/search-appprobe.js 9223 --shot
+npm run agent:appprobe -- --shot      # 宠物经 search_files 查本机索引的整链（会发一次真实 DeepSeek 请求）
 ```
 
 `search-appprobe.js` 覆盖：搜索栏在不在顶栏（旧的「搜索」按钮必须已经没了）、`attachBar` 有没有认领到当前这个输入框节点、聚焦展开与定位（下拉贴在输入框下方、不出窗口）、徽标状态、字数下限、真查询有结果、结果形状（绝对路径 / 文件夹标志 / size / 修改时间）、↑↓ 选择、过期列表与越界序号被拒、连打两次只留最后一次、Ctrl+F 聚焦、Esc 收起并交还焦点、点外面收起而点搜索栏不收起、设置卡片字段齐。
@@ -95,6 +97,8 @@ npm run search:appprobe -- --shot     # 等价于 node tools/search-appprobe.js 
 最后一步是 `enabled` 开关的往返：探针把 `search.enabled` 写成 false（走 `TB.api.config.save` → `applyConfigResult` → `buildShell`，跟用户在设置里点保存是同一条路），断言顶栏整条搜索栏和徽标都不再渲染、`TB.search` 交出了那个已销毁的输入框、Ctrl+F 与 `focus()` 都成空操作，然后在 `finally` 里把原值写回去并确认搜索栏、徽标、`attachBar` 都回来了。**这段别删**：`enabled` 曾经只被设置面板写、没人读，开关点了没反应；现在它由 `topbar.js` 的 `build()` 消费，是唯一能让这条链路"配置即界面"的地方。跑探针的机器上如果本来就是关的，这一步会打印跳过。
 
 **size 和修改时间这两项别当装饰删**：它们走 koffi 的 `int64*` / `uint64*` 出参，是这条链路上最容易静默归零的地方（见下节）。
+
+`agent-appprobe.js` 走的是另一个消费者那条路：宠物 → `search_files` → 本机索引 → 模型 → 界面提示行 → 落盘。它往 `%TEMP%` 建一个随机两层目录里的文件，问宠物这文件在哪，断言 `ai:tool` 事件、宠物上方那行「查了本机文件索引…→ N 条」（截图趁提示还在屏上时抓）、回答里的路径本机真存在、`state.json` 里既没有 `role:"tool"`/`tool_calls` 也没有命中统计那行，最后把 `ai.agentTools.enabled` 等原值恢复。**关键在问题必须问一个历史里没出现、又猜不出来的文件**：第一版问 `Everything.exe`，模型照着对话里的旧答案答；第二版换成 `%TEMP%\toolbar-agent-probe-<时间戳>.txt`，它照那个形状编了个路径、照样没点工具——随机目录名才是逼它真去查索引的东西。跑这条探针会发一次真实的 DeepSeek 请求，也会往他的对话历史里多留两行。
 
 ## 7. 已知的坑
 

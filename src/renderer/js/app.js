@@ -44,8 +44,16 @@ TB.app = {
       this.refresh('ai');
     });
     TB.api.ai.onDelta((payload) => {
-      const stream = this.state.ai.stream || { text: '', reasoning: '' };
-      this.state.ai = { ...this.state.ai, stream: { text: stream.text + (payload.text || ''), reasoning: stream.reasoning + (payload.reasoning || '') } };
+      const stream = this.state.ai.stream || { text: '', reasoning: '', tools: [] };
+      this.state.ai = { ...this.state.ai, stream: { text: stream.text + (payload.text || ''), reasoning: stream.reasoning + (payload.reasoning || ''), tools: stream.tools } };
+      this.refresh('ai');
+    });
+    // 它每调一次本机工具补一条，攒在 stream.tools 里：流式一结束就跟着 stream 一起消失，
+    // 不进对话历史（工具回给模型的那些绝对路径本来也不落盘）
+    TB.api.ai.onTool((payload) => {
+      const stream = this.state.ai.stream || { text: '', reasoning: '', tools: [] };
+      const tools = (stream.tools || []).concat([{ label: payload.label, count: payload.count }]);
+      this.state.ai = { ...this.state.ai, stream: { ...stream, tools } };
       this.refresh('ai');
     });
     TB.api.ai.onDone(() => {

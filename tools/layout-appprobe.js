@@ -137,7 +137,14 @@ async function main() {
   if (!a.slot1 || !a.slot2) failures.push('原音乐位没拆成两格');
   else {
     if (a.slot1.y !== a.slot2.y || Math.abs(a.slot1.x + a.slot1.w - a.slot2.x) > 12) failures.push(`两格不是左右并排：${JSON.stringify([a.slot1, a.slot2])}`);
-    if (a.slot1.module !== 'placeholder' || a.slot2.module !== 'placeholder') failures.push('两格没挂占位组件');
+    // 两格挂什么由 layout.json 说当下算（他随时能在「组件与位置」里换成待办/剪贴板），
+    // 所以这里只要求「有组件、不重复」——原来那句「必须是 placeholder」一换布局就假报警。
+    for (const key of ['slot1', 'slot2']) {
+      if (!a[key].module) failures.push(`${key} 没挂组件（data-module 是空的）`);
+    }
+    if (a.slot1.module === a.slot2.module && a.slot1.module !== 'placeholder') {
+      failures.push(`两格挂了同一个「${a.slot1.module}」：一个组件两个位置时只有最后一个拿得到刷新`);
+    }
   }
   for (const [at, box] of Object.entries(a)) {
     if (box && box.content > box.h + 1) failures.push(`「${at}」内容比位置高 ${box.content - box.h}px，会被裁掉`);

@@ -55,7 +55,7 @@ TB.voice = {
     }
     this.mic = TB.util.el('button', {
       class: 'voice-mic',
-      title: '单击宠物说话',
+      title: '点这里说话',
       // 不用 🎤 表情：Windows 下会画成灰色斜杠，且不吃 currentColor，禁用/录音态分不出来
       html: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>',
       onclick: () => this.toggle()
@@ -76,22 +76,10 @@ TB.voice = {
     this.mic.title = this.recording
       ? '点击结束（再点一次宠物也行）'
       : usable
-        ? '点击说话（也可以直接单击宠物）'
+        ? '点击说话（打字就直接在旁边的框里写）'
         : this.enabled()
           ? '语音模型未安装：先跑 npm run voice:install'
           : '语音已在设置里关闭';
-  },
-
-  // 宠物上的单击入口：录音中→停麦；能录→开麦并浮出对话条看实时字幕；
-  // 开不了麦返回 false，让 AI 组件退回打字浮层，免得点了没反应。
-  tap() {
-    if (this.recording) {
-      this.stopRecord();
-      return true;
-    }
-    if (!this.asrReady()) return false;
-    this.startRecord();
-    return true;
   },
 
   toggle() {

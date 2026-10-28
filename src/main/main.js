@@ -12,6 +12,7 @@ const music = require('./services/music');
 const { Store } = require('./services/store');
 const { ClipboardHistory } = require('./services/clipboard-history');
 const { AiChat } = require('./services/ai');
+const { buildTools } = require('./services/ai-tools');
 const { AiKey } = require('./services/ai-key');
 const { Voice } = require('./services/voice');
 const { DshHost } = require('./services/dsh');
@@ -413,7 +414,10 @@ if (!gotLock) {
       store,
       getKey: () => aiKey.get(),
       getConfig: () => config.ai,
-      emit: push
+      emit: push,
+      // 宠物能调的本机工具。两道闸：agentTools 开关（默认关）+ 搜索本身没被关掉。
+      // 只给只读的那一个，「打开文件」的口子对模型永久封死（见 services/ai-tools.js 顶部注释）。
+      getTools: () => (config.ai.agentTools?.enabled && config.search?.enabled ? buildTools({ everything }) : [])
     });
 
     registerIpc();

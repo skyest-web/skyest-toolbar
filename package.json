@@ -18,6 +18,8 @@
     "demo": "node tools/make-demo-audio.js",
     "everything:check": "node ./tools/everything-check.js",
     "search:appprobe": "node ./tools/search-appprobe.js",
+    "agent:appprobe": "node ./tools/agent-appprobe.js",
+    "ai:appprobe": "node ./tools/ai-appprobe.js",
     "layout:appprobe": "node ./tools/layout-appprobe.js"
   },
   "dependencies": {

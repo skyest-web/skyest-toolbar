@@ -24,11 +24,13 @@
 
 | 改动面 | 命令（Git Bash，项目目录） |
 |---|---|
-| 主进程 AI/流式 | `npm run test:ai`（零依赖 mock，37 项） |
+| 主进程 AI/流式 | `npm run test:ai`（零依赖 mock，55 项；L 段是工具调用那圈） |
 | dsh 子进程 | `npm run dsh:check` |
 | 界面/手势/dsh 窗口 | 带 `--remote-debugging-port=9223` 起应用，再 `node tools/dsh-appprobe.js 9223 --shot` 或 `node tools/voice-appprobe.js 9223 --shot` |
 | 布局（`layout.json` / grid / 组件与位置） | `npm run layout:appprobe -- 9223 --shot`（等价 `node tools/layout-appprobe.js 9223 --shot`）：逐格量「内容高度 vs 位置高度」，抓底部被 `.area{overflow:hidden}` 裁掉的那类溢出；截图落 `samples/layout-after.png` |
 | Everything 搜索 | `npm run everything:check`（无界面，含 size/时间数值抽查）+ 带调试端口起应用后 `npm run search:appprobe -- --shot`（顶栏搜索栏常驻、下拉锚定、Ctrl+F/Esc、越界序号被拒、`search.enabled` 关掉后整条栏消失并能恢复，都在这条里） |
+| 宠物调本机工具（`search_files`） | `npm run agent:appprobe -- --shot`（真发一次 DeepSeek 请求：开关生效、`ai:tool` 提示行、回答里的路径本机真存在、工具轮次不落盘、退出时把配置恢复原值）；`--check` 只看前置不动配置 |
+| AI 面板几何（气泡/浮层会不会被裁、被盖） | `npm run ai:appprobe -- 9223 --reload --shot [--height 420]`：四种状态（都收起/打字浮层/完整对话/两个都开）各量一遍，断言气泡挂在 body 上、还在窗口里、贴着宠物头顶，外加「宠物头顶不被格子上沿裁」「打字浮层不盖面板里任何东西」「聊天列表自己被压住」；末尾还验气泡的「读完三秒收起」（借 `TB.voice.setSpeaking` 模拟朗读中/结束）；`--reload` 改完渲染层不用重启应用 |
 | 窗口尺寸/加屏换机器 | `npm run dpi:measure`：把「请求宽高 → 实际宽高」在三块屏上各量一遍。系数不再是 `(目标÷当前)` 这个规律时，`dsh-window.js` 的 `restoreBounds()` 要跟着改 |
 
 真机验证的规矩：**别用假数据自证**，CDP 驱动真实运行的应用；起应用前 `unset ELECTRON_RUN_AS_NODE`；这仓库有单实例锁，附着前确认没连到上一份旧实例。
@@ -50,6 +52,14 @@
 - **一个组件挂两个位置时，只有最后一个位置拿得到刷新**：`buildShell()` 用 `this.nodes[slot.module]` 做键，`placeholder` 占两格没问题（它没有 `update`），但以后往两格里放**有 update 的**组件必须先改这个键控方式。
 - **窄列变体走 CSS 容器查询**，不是媒体查询：`.area` 上 `container-type: inline-size` + `container-name`，`@container clock (max-width: 380px)` / `@container player (max-width: 420px)`。格子宽度来自固定的 grid 轨道，所以容器查询是可靠的；窗口宽度变化不影响判断。加了新变体就要在 `layout-appprobe` 里断言容器查询真的生效（像 `playerContainer` / `chipsPerRow` 那样）。
 - **`config.search.enabled` 由 `topbar.js` 的 `build()` 消费**（关掉时整条搜索栏不渲染，Ctrl+F 跟着失效），不是渲染层面板里的开关——别把它改回只写不读。
+- **`contextFor()` 会自己把当前这句补成最后一条 user**：`send()` 必须先取上下文、再 `this.messages.push(...)`。反过来就是每个请求把用户那句话发两遍（`ai-mock-test` 的 L15 守着）。
+- **工具轮次只活在 `send()` 的局部数组里**：带 `tool_calls` 的 assistant 和 `role:'tool'` 都不进 `this.messages`，搜索结果里那些绝对路径就是这么挡在 `state.json` 之外的。别"顺手"把它们并入历史。
+- **`deepseek-reasoner` 不支持 function calling**（带 `tools` 会被 400），`availableTools()` 里那句模型判断是守门，不是冗余。
+- **CDP 探针里 `await TB.ai.submit()` 等于等整轮请求跑完**（`invoke('ai:send')` 到流结束才 resolve），要采流式期间才存在的 DOM 就得起一个不 await 的 submit、把结果挂在 `window` 上再轮询。
+- **验工具链的问题必须问一个历史里没出现、也猜不出来的文件**：模型会照上一轮的回答把路径编出来，看着全对其实根本没点工具（`agent-appprobe` 靠随机两层目录名逼它）。
+- **要越出自己格子的 UI 一律挂 `document.body` + `position:fixed`**：`.area{overflow:hidden}` 会把越界的部分**静默**吃掉（矮屏上宠物气泡就是这么被切掉的，DOM 在、量得到、就是看不见）。跟搜索下拉同一个套路：JS 按锚点矩形写 `top/left`，并在 `resize` / `scroll` / 相关开合处重贴；`z-index` 压在 modal(50) 之下（气泡用 40），别盖住设置面板。
+- **Electron 的 CDP 没有 Browser 域**（`Browser.getWindowBounds/setWindowBounds` 报 wasn't found），改不了真窗口；量矮屏用 `Emulation.setDeviceMetricsOverride`。两个坑：① 它**不发 resize**、而且第一次覆盖常常只改 `innerHeight` 不重排 grid，要补发 `resize` 再把样式判脏重测，否则量到的是过渡态；② 覆盖**清不掉**——`clearDeviceMetricsOverride`、把宽高设成 0、`Page.reload` 三种办法实测全部无效（`innerHeight` 一直停在覆盖值），只能把覆盖重新设回 `outerWidth/outerHeight`（outer 不受覆盖影响，拿它当窗口真尺寸），要彻底还原得重启应用。见 `tools/ai-appprobe.js` 的 `restoreViewport()`。
+- **`<details>` 里的列表不能靠 flex 压住**：非 summary 的子节点被塞进浏览器匿名插槽盒子，那个盒子按内容算高度，于是 `.ai-list` 的 `flex:1 / min-height:0 / overflow:auto` 全都不生效（实测撑到 3181px、`clientHeight == scrollHeight`，压根没有滚动条，底部整截被 `.area{overflow:hidden}` 裁掉）。这份 Electron 是 Chrome 130，`CSS.supports('selector(::details-content)')` 为 false，也改不了那个盒子。所以「完整对话」的开合是 `div.ai-history` + `.open` 类（`TB.ai.setHistory()`），收起时列表 `display:none`。
 
 ## 换到新机器要做什么
 

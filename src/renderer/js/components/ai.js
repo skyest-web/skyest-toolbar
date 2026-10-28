@@ -18,20 +18,40 @@ TB.ai = {
       TB.util.el('button', { class: 'link-btn', text: '设置', title: '打开 AI 与语音设置', onclick: () => TB.settings.open('ai') })
     ]);
 
-    this.bubbleText = TB.util.el('div', { class: 'ai-bubble-text' });
-    this.bubbleEl = TB.util.el('div', { class: 'ai-bubble' }, [this.bubbleText]);
+    // 气泡是浮在 body 上的，不留在格子里：矮屏时它本来就会顶出 .area 被 overflow:hidden 裁掉，
+    // 而「它在说什么」恰恰是最不能看不见的那块（定位见 placeBubble，跟搜索下拉同一个套路）。
+    // 组件重建时节点不跟着重建——isConnected 为真就继续用同一个。
+    if (!this.bubbleEl?.isConnected) {
+      this.bubbleText = TB.util.el('div', { class: 'ai-bubble-text' });
+      this.bubbleEl = TB.util.el('div', { class: 'ai-bubble' }, [this.bubbleText]);
+      document.body.appendChild(this.bubbleEl);
+    }
+    // 它调本机工具的痕迹（「查了本机文件索引「xxx」→ 12 条」）：只在流式期间在，说完就收
+    this.toolEl = TB.util.el('div', { class: 'ai-tool' });
     this.petHost = TB.util.el('div', { class: 'ai-pet' });
     this.ask = TB.util.el('div', { class: 'ai-ask' });
-    this.stage = TB.util.el('div', { class: 'ai-stage' }, [this.bubbleEl, this.petHost, this.ask]);
+    this.stage = TB.util.el('div', { class: 'ai-stage' }, [this.toolEl, this.petHost, this.ask]);
 
-    this.summary = TB.util.el('summary', { text: '完整对话' });
+    this.summary = TB.util.el('div', { class: 'ai-history-head', role: 'button', tabindex: '0', text: '完整对话' });
     this.list = TB.util.el('div', { class: 'ai-list' });
     this.jump = TB.util.el('button', { class: 'ai-jump', text: '↓ 回到底部', onclick: () => this.scrollToEnd(true) });
-    this.history = TB.util.el('details', { class: 'ai-history' }, [this.summary, this.list]);
+    this.history = TB.util.el('div', { class: 'ai-history' }, [this.summary, this.list]);
+    // 以前这里是 <details>/<summary>，列表塞在浏览器的匿名插槽盒子里：那个盒子不是 flex 项、
+    // 高度又按内容算，于是 .ai-list 一路撑到几千像素，既没有滚动条也压穿格子（矮屏底部整截被裁）。
+    // 换成 div + .open 之后「列表 flex:1 / min-height:0 / 自己滚」这套才真的生效。
+    this.historyOpen = false;
+    this.toggleHistory = () => this.setHistory(!this.historyOpen);
+    this.summary.addEventListener('click', this.toggleHistory);
+    this.summary.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        this.toggleHistory();
+      }
+    });
 
     this.input = TB.util.el('textarea', {
       class: 'ai-input',
-      placeholder: '跟它说点什么…（Enter 发送，Shift+Enter 换行）',
+      placeholder: '打字后 Enter 发送（Shift+Enter 换行），或点麦克风按钮说话',
       spellcheck: 'false',
       maxlength: '8000'
     });
@@ -57,12 +77,30 @@ TB.ai = {
       if (this.compose.contains(event.target)) return;
       this.closeCompose();
     });
+    // 打字浮层是绝对定位的浮层，靠面板自己的 padding-bottom 给它腾出底部那条带；
+    // root 每次重建都是新节点（没有 compose-open），而 compose 也新建了、类跟着丢了，两边天然一致
+    this.composeRoot = root;
 
     // persona 决定渲染后端：video=蓝毛小女仆（webm 精灵），pet=猫团子 SVG，plain=不出宠物
     this.pet = this.persona() === 'pet' ? TB.pet : TB.petVideo;
     this.petHandle = this.pet.mount(this.petHost, { mood: 'calm', motion: this.motion() });
     this.petShown = { mood: null, talk: null };
     this.bindPet();
+    // 换屏、展开完整对话、开合打字浮层都会挪动宠物的矩形，气泡得跟着重贴。
+    // TB.ai 是单例，window 上的监听只绑一次；「完整对话」的开合走 setHistory()，那里自己会重贴
+    if (!TB.ai._placeBound) {
+      TB.ai._placeBound = true;
+      window.addEventListener('resize', () => TB.ai.placeBubble());
+      // 矮屏上 grid 会溢出、页面能滚（focus 输入框就会滚 53px）：宠物滚走了气泡得跟着，
+      // 否则 fixed 的气泡留在原地盖住宠物。capture 才收得到内部容器（.ai-list）的滚动
+      window.addEventListener('scroll', () => TB.ai.placeBubble(), { capture: true, passive: true });
+    }
+    // 重建即重新开始：清掉上一轮的收起状态和倒计时。bubbleKey 置 null 让首次渲染只记账不显示，
+    // 免得应用刚起来时把历史里那条旧回复又念一遍似地闪三秒
+    clearTimeout(this.bubbleTimer);
+    this.bubbleTimer = null;
+    this.bubbleKey = null;
+    this.bubbleHidden = false;
     TB.dsh.subscribe(() => this.syncDsh());
     this.syncDsh();
     this.stick = true;
@@ -74,15 +112,16 @@ TB.ai = {
     TB.voice?.init(this);
   },
 
-  // 单击=开麦说话，双击=DeepSeek Harness 窗口（独立窗口，能拖到别的屏），右键=打断当前回复/朗读。
+  // 单击=浮出输入条（打字还是点麦克风说话，由他自己选），双击=DeepSeek Harness 窗口（独立窗口，能拖到别的屏），右键=打断当前回复/朗读。
   // 单击延后 260ms 给双击让位（浏览器连发 click/click/dblclick，两次 click 的定时器都会被 dblclick 清掉）
   bindPet() {
     this.petHost.addEventListener('click', () => {
       clearTimeout(this.tapTimer);
       this.tapTimer = setTimeout(() => {
         this.pet.react?.(this.petHandle);
-        // tap() 返回 false = 开不了麦（没装语音模型或设置里关了），那就直接给打字入口
-        if (!TB.voice?.tap()) this.openCompose(true);
+        // 只在已经在录音时接管这一击——那是「说完了」的快捷；其余情况一律只把条子浮出来，不开麦
+        if (TB.voice?.recording) TB.voice.stopRecord();
+        else this.openCompose(true);
       }, 260);
     });
     this.petHost.addEventListener('dblclick', () => {
@@ -100,9 +139,43 @@ TB.ai = {
     if (this.dshBtn) this.dshBtn.textContent = TB.dsh.label();
   },
 
+  // 贴在宠物头顶居中（工具提示行露出来就让到它上面），横向夹在窗口内。
+  // 顶边不够放时压缩气泡高度而不是压到宠物脸上：宁可气泡内部滚动，也别把宠物和面板按钮糊住。
+  placeBubble() {
+    const el = this.bubbleEl;
+    if (!el?.isConnected || !el.classList.contains('show')) return;
+    const anchor = (this.toolEl.classList.contains('show') ? this.toolEl : this.petHost).getBoundingClientRect();
+    const areaWidth = this.petHost.closest('.area')?.getBoundingClientRect().width || 320;
+    const width = Math.max(180, Math.min(420, areaWidth - 20));
+    el.style.width = `${Math.round(width)}px`;
+    el.style.maxHeight = `${Math.round(Math.min(window.innerHeight * 0.45, Math.max(56, anchor.top - 16)))}px`;
+    const height = el.getBoundingClientRect().height;
+    const left = Math.max(8, Math.min(anchor.left + anchor.width / 2 - width / 2, window.innerWidth - width - 8));
+    el.style.left = `${Math.round(left)}px`;
+    el.style.top = `${Math.round(Math.max(8, anchor.top - height - 8))}px`;
+    // 高度被压过时保住最新那句：气泡是「它在说什么」，不是聊天记录本录
+    this.bubbleText.scrollTop = this.bubbleText.scrollHeight;
+  },
+
+  // 展开/收起「完整对话」：开合都会挪动宠物和列表的矩形，所以顺手重贴气泡
+  setHistory(open) {
+    this.historyOpen = Boolean(open);
+    this.history.classList.toggle('open', this.historyOpen);
+    this.placeBubble();
+  },
+
   openCompose(focus) {
     this.compose.classList.add('open');
+    // 浮层是绝对定位的，不腾地方就会压住宠物的脚（实测矮屏上盖掉 25px）。
+    // 高度不能写死：录音按钮在不在、字体缩放都会改它，所以开的时候量一次再让面板腾出底部那条带。
+    if (this.composeRoot) {
+      this.composeRoot.style.setProperty('--compose-h', `${this.compose.offsetHeight}px`);
+      this.composeRoot.classList.add('compose-open');
+    }
     if (focus) this.input.focus();
+    // 先 focus 再贴：矮屏上 grid 会溢出，浏览器把输入框滚进视野是 focus 干的，
+    // 先贴后滚的话气泡（fixed）留在原地，正好盖到宠物头上
+    this.placeBubble();
   },
 
   closeCompose(force) {
@@ -110,7 +183,9 @@ TB.ai = {
     if (TB.voice?.recording) return;
     if (!force && this.input.value.trim()) return;
     this.compose.classList.remove('open');
+    this.composeRoot?.classList.remove('compose-open');
     if (this.compose.contains(document.activeElement)) this.input.blur();
+    this.placeBubble();
   },
 
   persona() {
@@ -163,7 +238,7 @@ TB.ai = {
     this.input.value = '';
     this.closeCompose(true);
     this.stick = true;
-    TB.app.state.ai = { ...TB.app.state.ai, error: null, stream: { text: '', reasoning: '' } };
+    TB.app.state.ai = { ...TB.app.state.ai, error: null, stream: { text: '', reasoning: '', tools: [] } };
     await TB.api.ai.send(text);
     this.update(TB.app.state);
   },
@@ -192,7 +267,7 @@ TB.ai = {
       class: 'link-btn',
       text: '重试上一条',
       onclick: () => {
-        TB.app.state.ai = { ...TB.app.state.ai, error: null, stream: { text: '', reasoning: '' } };
+        TB.app.state.ai = { ...TB.app.state.ai, error: null, stream: { text: '', reasoning: '', tools: [] } };
         TB.api.ai.retry();
       }
     });
@@ -233,17 +308,63 @@ TB.ai = {
     // persona:'plain' 是看腻了的退路：收起舞台、展开完整历史，不用回滚代码
     const plain = this.persona() === 'plain';
     this.stage.classList.toggle('hidden', plain);
-    if (plain && !this.plainOpened) this.history.open = true;
+    if (plain && !this.plainOpened) this.setHistory(true);
     this.plainOpened = plain;
 
     // 流式期间标签可能只到了半截，先别把它画进泡里
     const parsed = stream ? TB.emotion.splitLeading(stream.text) : null;
     const bubbleText = stream ? (parsed.pending ? '' : parsed.content) : lastAssistant?.content || '';
     this.bubbleText.textContent = bubbleText;
-    this.bubbleEl.classList.toggle('show', Boolean(bubbleText) || Boolean(stream));
+
+    // 气泡是「它刚说了什么」，不是常驻字幕：这一轮说完三秒就收起（没装语音时以回复结束为准）。
+    // 一轮 = 一个 key（消息条数 + 末条长度），收起状态只记在当前这轮，下一回复 key 变了自然又显示
+    const roundKey = `${messages.length}|${lastAssistant?.content?.length || 0}`;
+    if (this.bubbleKey !== roundKey) {
+      const boot = this.bubbleKey === null;
+      this.bubbleKey = roundKey;
+      // 首次渲染（开应用、换布局）时历史里那条是旧回复，不该闪一下；但那一轮正在流式就照常显示
+      this.bubbleHidden = boot && !stream;
+      clearTimeout(this.bubbleTimer);
+      this.bubbleTimer = null;
+    }
+    const hasReply = Boolean(bubbleText) || Boolean(stream);
+    // 流式一开始就把「已收起」撤掉：用户那句话可能到整轮结束才进 messages，只认 key 的话
+    // 新一轮在流式期间还带着上一轮的收起状态，气泡整轮都不出来
+    if (stream && this.bubbleHidden) {
+      this.bubbleHidden = false;
+      clearTimeout(this.bubbleTimer);
+      this.bubbleTimer = null;
+    }
+    // 三秒从「真的说完了」起算：流式在跑、或朗读在说话都不算说完。朗读一开始就把表撤掉，
+    // 结束那次渲染（voice.setSpeaking → refresh）重新起表——否则「说完三秒」会变成「回复出来三秒」，
+    // 话还没念完字就没了。
+    const idle = !stream && !TB.voice?.speaking;
+    if (idle && hasReply && !this.bubbleHidden && !this.bubbleTimer) {
+      this.bubbleTimer = setTimeout(() => {
+        this.bubbleTimer = null;
+        if (TB.voice?.speaking || TB.app.state.ai?.streaming) return;
+        this.bubbleHidden = true;
+        this.update(TB.app.state);
+      }, 3000);
+    } else if (this.bubbleTimer && (!idle || this.bubbleHidden)) {
+      clearTimeout(this.bubbleTimer);
+      this.bubbleTimer = null;
+    }
+
+    // plain 形象把舞台收了；气泡现在挂在 body 上，不再跟着 .ai-stage 的 hidden 一起消失，得自己判
+    const showBubble = !plain && hasReply && !this.bubbleHidden;
+    this.bubbleEl.classList.toggle('show', showBubble);
     this.bubbleEl.classList.toggle('typing', Boolean(stream && !bubbleText));
+    if (showBubble) this.placeBubble();
     this.ask.textContent = lastUser ? `你：${lastUser.content}` : '';
     this.ask.classList.toggle('show', Boolean(lastUser));
+
+    // 工具痕迹跟着 stream 走：流一结束就空掉，不留在这条对话的历史里
+    const tools = stream?.tools || [];
+    this.toolEl.textContent = tools
+      .map((item) => `${item.label} → ${item.count ? `${item.count} 条` : '没查到'}`)
+      .join('　');
+    this.toolEl.classList.toggle('show', Boolean(stream) && tools.length > 0);
 
     this.summary.textContent = `完整对话 (${messages.length})`;
 
@@ -280,7 +401,7 @@ TB.ai = {
       this.list.appendChild(
         TB.util.el('div', { class: 'ai-empty muted' }, [
           ai.key?.set
-            ? TB.util.el('span', { text: '还没有对话。单击宠物说话，点「打字」输入，双击宠物开 Harness 窗口。' })
+            ? TB.util.el('span', { text: '还没有对话。单击宠物浮出输入条（打字或点麦克风说话），点「打字」同效，双击宠物开 Harness 窗口。' })
             : TB.util.el('button', { class: 'link-btn', text: '先在设置里填 DeepSeek 密钥 →', onclick: () => TB.settings.open() })
         ])
       );

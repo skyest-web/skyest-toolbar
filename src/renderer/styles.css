@@ -1414,6 +1414,12 @@ input[type='checkbox'] {
   position: relative;
 }
 
+/* 打字浮层展开时给它腾出底部那条带：浮层绝对定位在 bottom:6，不腾地方就会压住宠物的脚
+   （矮屏实测盖掉 25px）。--compose-h 由 TB.ai.openCompose() 按浮层实测高度写入。 */
+.ai #ai.compose-open {
+  padding-bottom: calc(var(--compose-h, 56px) + 12px);
+}
+
 .ai-head {
   display: flex;
   align-items: center;
@@ -1443,12 +1449,19 @@ input[type='checkbox'] {
   padding: 8px 10px;
 }
 
+/* 浮层：挂在 body 上、贴在宠物头顶。留在格子里的话，矮屏时气泡顶边越出 .area 就被
+   overflow:hidden 静默裁掉（它在说什么恰恰是最不能看不见的一块）。
+   宽度与 top/left 由 TB.ai.placeBubble() 按宠物矩形写；z-index 压在 modal(50) 之下，
+   开着设置面板时不该被气泡盖住。 */
 .ai-bubble {
   display: none;
-  position: relative;
-  flex: 0 1 auto;
-  min-height: 0;
+  position: fixed;
+  z-index: 40;
   flex-direction: column;
+  max-height: 45vh;
+  /* 气泡只负责「它在说什么」：单击宠物浮出输入条、双击开 Harness 才是主交互，
+     浮层压到谁头上都不该把点击吃掉（要看全文有「完整对话」） */
+  pointer-events: none;
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -1456,6 +1469,7 @@ input[type='checkbox'] {
   font-size: 0.84rem;
   line-height: 1.5;
   word-break: break-word;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
 .ai-bubble.show {
@@ -1501,7 +1515,10 @@ input[type='checkbox'] {
 }
 
 .ai-pet {
-  flex: 0 0 auto;
+  /* 矮屏时先缩宠物：不能让它顶出格子，被 .area 的 overflow:hidden 削掉头顶（实测 420 高的屏裁 5px）。
+     缩到底只剩个小人，但那种高度本来就站不下完整的一个，宁可它小也别缺一块 */
+  flex: 0 1 auto;
+  min-height: 78px;
   width: 150px;
   height: 155px;
   margin: 0 auto;
@@ -1518,7 +1535,10 @@ input[type='checkbox'] {
 
 .ai-ask {
   display: none;
-  flex: 0 0 auto;
+  /* 可以缩：矮屏上舞台不够高时，让「你：xxx」这行先让位，宠物才会轮到收缩，
+     两者都能缩就没人被格子上沿裁头（原来是宠物不可缩，头顶直接少 5~14px） */
+  flex: 0 1 auto;
+  min-height: 0;
   color: var(--muted);
   font-size: 0.74rem;
   text-align: center;
@@ -1531,19 +1551,45 @@ input[type='checkbox'] {
   display: block;
 }
 
+/* 它调本机工具的痕迹：和 .ai-ask 同一类小字，但用强调色，免得被当成它说的话 */
+.ai-tool {
+  display: none;
+  flex: 0 1 auto;
+  min-height: 0;
+  color: var(--accent);
+  opacity: 0.85;
+  font-size: 0.72rem;
+  text-align: center;
+  line-height: 1.35;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ai-tool.show {
+  display: block;
+}
+
+/* 「完整对话」的开合是 div + .open，不是 <details>：details 会把列表塞进匿名插槽盒子，
+   那个盒子按内容算高度，列表既不滚也压穿格子（实测 3181px 顶到底被裁）。 */
 .ai-history {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* 极矮屏上（420 高、打字浮层和完整对话都开着）分给列表的是 0 像素，
+     列表还剩 16px 的内边距盒子会漏到父盒外面、正好压在打字浮层上；这里裁一刀，
+     没地方时就是「只剩标题行」，不会有一截透明的聊天条盖到输入框。 */
+  overflow: hidden;
   border-top: 1px solid var(--line);
 }
 
-.ai-history[open] {
+.ai-history.open {
   flex: 1 1 40%;
 }
 
-.ai-history summary {
+.ai-history-head {
+  flex: 0 0 auto;
   padding: 6px 10px;
   color: var(--muted);
   font-size: 0.75rem;
@@ -1551,8 +1597,14 @@ input[type='checkbox'] {
   user-select: none;
 }
 
-.ai-history summary:hover {
+.ai-history-head:hover {
   color: var(--text);
+}
+
+/* 收起时列表整个不参与布局：换成 div 之后没有 details 帮忙隐藏了，
+   留着它会把 .ai-history 撑到内容高度（实测 3209px），格子底下全被它压穿 */
+.ai-history:not(.open) .ai-list {
+  display: none;
 }
 
 .ai-list {

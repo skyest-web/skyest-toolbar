@@ -232,21 +232,33 @@ function buildExpression(pcmBase64) {
   } else {
     out.composeMissing = 'TB.ai.compose 不存在';
   }
-  // ---- 9. 宠物手势接线：不碰真麦克风（把 asrReady 暂时判死），看单击有没有退回打字 ----
+  // ---- 9. 宠物手势接线：单击只浮出输入条，开不开麦由他自己点麦克风；这一段绝不碰真麦克风 ----
   if (TB.ai?.compose && TB.voice) {
     const pet = document.querySelector('.ai-pet');
-    out.tapIsFunction = typeof TB.voice.tap === 'function';
+    out.tapGone = typeof TB.voice.tap === 'undefined';
     TB.ai.closeCompose(true);
     const realReady = TB.voice.asrReady;
+    const realStart = TB.voice.startRecord;
+    let started = 0;
+    // 语音「可用」也点了不该开麦，这才是这次改动的判据；startRecord 换成计数器，测完还原
+    TB.voice.asrReady = () => true;
+    TB.voice.startRecord = () => { started += 1; };
+    pet.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await sleep(400);
+    out.clickOpensCompose = TB.ai.compose.classList.contains('open');
+    TB.ai.closeCompose(true);
+    // 语音不可用时同样只浮条子，不该报错也不该试着开麦
     TB.voice.asrReady = () => false;
     pet.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await sleep(400);
-    out.clickFallsBackToCompose = TB.ai.compose.classList.contains('open');
+    out.clickOpensComposeWithoutVoice = TB.ai.compose.classList.contains('open');
+    out.clickStartsRecording = started > 0 || TB.voice.recording === true;
     TB.voice.asrReady = realReady;
+    TB.voice.startRecord = realStart;
     TB.ai.closeCompose(true);
     pet.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     await sleep(60);
-    out.dblclickOpensCompose = TB.ai.compose.classList.contains('open');
+    out.dblclickKeepsComposeClosed = !TB.ai.compose.classList.contains('open');
     // 右键=打断朗读/生成：这里没有流式请求，只要不抛就算接线通
     pet.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     out.rightClickNoThrow = true;
@@ -335,7 +347,7 @@ async function capture(target, file, before) {
     const closed = path.join(dir, 'ui-compose-closed.png');
     const open = path.join(dir, 'ui-compose-open.png');
     await capture(target, closed, "TB.ai.input.value='';TB.voice.recording=false;TB.ai.closeCompose(true);'closed'");
-    await capture(target, open, "TB.ai.openCompose(true);TB.ai.input.value='打字或单击宠物说话';'open'");
+    await capture(target, open, "TB.ai.openCompose(true);TB.ai.input.value='打字或点麦克风说话';'open'");
     // 布置用的草稿不能留在他的输入框里
     await evaluate(target, "TB.ai.input.value='';TB.ai.closeCompose(true);'reset'", 10000);
     console.log(`[appprobe] 截图：${closed}\n           ${open}`);
