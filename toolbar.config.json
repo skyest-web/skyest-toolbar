@@ -1,7 +1,7 @@
 {
   "display": {
     "mode": "index",
-    "index": 1,
+    "index": 0,
     "match": {
       "width": 1920,
       "height": 540,
@@ -127,7 +127,7 @@
     "emotion": true,
     "motion": "full",
     "agentTools": {
-      "enabled": true
+      "enabled": false
     }
   },
   "voice": {
