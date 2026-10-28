@@ -33,11 +33,8 @@ class DshWindow {
 
   ensureWindow() {
     if (this.win && !this.win.isDestroyed()) return;
-    const saved = this.rememberedBounds();
     this.win = new BrowserWindow({
-      ...(saved || DEFAULT_SIZE),
-      x: saved ? saved.x : undefined,
-      y: saved ? saved.y : undefined,
+      ...DEFAULT_SIZE,
       show: false,
       title: 'DeepSeek Harness',
       backgroundColor: '#0b0f14',
@@ -88,10 +85,21 @@ class DshWindow {
   rememberedBounds() {
     const saved = this.store.get('dshWindow');
     if (!saved || !Number.isFinite(saved.x) || !Number.isFinite(saved.y)) return null;
+    // 宽高存的是物理像素，200 这个下限也按物理像素算
     if (!(saved.width > 200 && saved.height > 200)) return null;
     // 上次那块屏可能已经拔了或者分辨率变了，落空就别用记忆位置
     if (!screen.getAllDisplays().some((display) => overlaps(display.bounds, saved))) return null;
     return saved;
+  }
+
+  // 分两步：先只按记回来的 x/y 摆位置，再按"窗口现在已经落在哪块屏"的缩放率换算尺寸。
+  // setBounds 的宽高是按窗口当前所在屏解释的，挪屏时会被乘以（目标屏 ÷ 当前屏）——
+  // 位置对了之后再给尺寸，这个系数就是 1，跨屏跨机器都不再漂（实测见 tools/dpi-bounds-measure.js）。
+  restoreBounds(saved) {
+    if (!saved) return;
+    this.win.setPosition(saved.x, saved.y);
+    const scale = screen.getDisplayMatching(this.win.getBounds()).scaleFactor || 1;
+    this.win.setSize(Math.max(320, Math.round(saved.width / scale)), Math.max(240, Math.round(saved.height / scale)));
   }
 
   persistBounds() {
@@ -99,14 +107,14 @@ class DshWindow {
     // 最大化/最小化态下 getBounds 给的是外扩后的矩形，存下来下次开就"越界"了
     if (this.win.isMaximized() || this.win.isMinimized()) return;
     const bounds = this.win.getBounds();
-    // 在这台机器上（副屏非 1x），传给构造函数的宽高会被按目标屏的缩放率再乘一遍，而 getBounds 回来的
-    // 已经是乘过的值——直接存回去，每次重启窗口就大一圈（实测 1180 → 1770 → 2656）。所以存之前除回去。
     const scale = screen.getDisplayMatching(bounds).scaleFactor || 1;
+    // 存物理像素：bounds 是"相对窗口所在那块屏"的 DIP，直接把 DIP 存回去，换到另一块
+    // 缩放率的屏上就会被再乘一次（这台机器实测每启动一次小一圈：1180 → 787 → 528）。
     this.store.set('dshWindow', {
       x: bounds.x,
       y: bounds.y,
-      width: Math.max(200, Math.round(bounds.width / scale)),
-      height: Math.max(200, Math.round(bounds.height / scale))
+      width: Math.max(200, Math.round(bounds.width * scale)),
+      height: Math.max(200, Math.round(bounds.height * scale))
     });
   }
 
@@ -115,7 +123,10 @@ class DshWindow {
     this.opened = true;
     const url = await this.host.start();
     if (!this.opened) return;
+    const fresh = !this.win || this.win.isDestroyed();
     this.ensureWindow();
+    // 只有新建的那次需要摆位置：复用时窗口自己的尺寸就是用户上次调出来的
+    if (fresh) this.restoreBounds(this.rememberedBounds());
     this.ensureView();
     // 只比"我们加载过的那条地址"：getURL() 在 dsh 303 跳 / 之后就没有 token 了，拿它比会每次都重刷页面
     if (this.loadedUrl !== url) {
