@@ -3,16 +3,18 @@
     "columns": [
       "330px",
       "minmax(0, 1fr)",
+      "minmax(0, 1fr)",
       "400px"
     ],
     "rows": [
       "32px",
-      "minmax(118px, 0.82fr)",
-      "minmax(150px, 1.18fr)",
+      "176px",
+      "minmax(150px, 1fr)",
       "78px"
     ],
     "areas": [
       [
+        "topbar",
         "topbar",
         "topbar",
         "topbar"
@@ -20,14 +22,17 @@
       [
         "clock",
         "gauges",
+        "gauges",
         "workbench"
       ],
       [
-        "clock",
         "player",
+        "slot1",
+        "slot2",
         "clipboard"
       ],
       [
+        "dock",
         "dock",
         "dock",
         "clipboard"
@@ -43,26 +48,38 @@
     },
     {
       "at": "clock",
-      "label": "左侧竖条",
+      "label": "左上：时钟与主机信息",
       "module": "clock",
       "enabled": true
     },
     {
+      "at": "player",
+      "label": "左下：音乐播放器",
+      "module": "player",
+      "enabled": true
+    },
+    {
       "at": "gauges",
-      "label": "中部上",
+      "label": "中部上：系统指标（固定高度）",
       "module": "gauges",
       "enabled": true
     },
     {
       "at": "workbench",
-      "label": "中部右上",
+      "label": "右上",
       "module": "clipboard",
       "enabled": true
     },
     {
-      "at": "player",
-      "label": "中部下",
-      "module": "player",
+      "at": "slot1",
+      "label": "中下左：占位",
+      "module": "workbench",
+      "enabled": true
+    },
+    {
+      "at": "slot2",
+      "label": "中下右：占位",
+      "module": "placeholder",
       "enabled": true
     },
     {

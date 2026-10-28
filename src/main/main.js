@@ -16,6 +16,7 @@ const { AiKey } = require('./services/ai-key');
 const { Voice } = require('./services/voice');
 const { DshHost } = require('./services/dsh');
 const { DshWindow } = require('./services/dsh-window');
+const { EverythingSearch } = require('./services/everything');
 
 const APP_ROOT = path.resolve(__dirname, '..', '..');
 const COMPONENT_DIR = path.join(APP_ROOT, 'src', 'renderer', 'js', 'components');
@@ -40,6 +41,7 @@ let aiChat = null;
 let voice = null;
 let dsh = null;
 let dshWindow = null;
+let everything = null;
 let placement = null;
 let fastTimer = null;
 let slowTimer = null;
@@ -331,6 +333,19 @@ function registerIpc() {
     return true;
   });
 
+  // Everything 文件搜索：渲染层只拿到 (listId, index)，真实路径留在主进程这边
+  ipcMain.handle('search:status', () => everything.status());
+  ipcMain.handle('search:probe', async () => {
+    await everything.probe();
+    return everything.status();
+  });
+  ipcMain.handle('search:query', (_event, query) => everything.search(query));
+  ipcMain.handle('search:open', (_event, listId, index) => everything.open(listId, index));
+  ipcMain.handle('search:startHost', async () => {
+    const result = await everything.startHost();
+    return { ...result, status: everything.status() };
+  });
+
   ipcMain.handle('app:quit', () => app.quit());  ipcMain.handle('app:relaunch', () => {
     app.relaunch();
     app.quit();
@@ -389,6 +404,11 @@ if (!gotLock) {
       onVisibility: () => push('dsh:state', dshStatus())
     });
 
+    // Everything 搜索：工作进程很轻（只加载一个 DLL），启动时探一次好让顶栏按钮一开始就报对状态；
+    // 真正的查询走懒发起，探不到 Everything 也只是状态写着"未运行"，不影响别的组件。
+    everything = new EverythingSearch({ appRoot: APP_ROOT, getConfig: () => config, emit: push });
+    everything.probe().catch(() => {});
+
     aiChat = new AiChat({
       store,
       getKey: () => aiKey.get(),
@@ -409,6 +429,8 @@ if (!gotLock) {
     if (voice) voice.shutdown();
     if (dshWindow) dshWindow.destroy();
     if (dsh) dsh.stop();
+    // Everything 客户端不在这里收：它可能是用户自己开的，也可能被顶栏搜索拉起来当常驻索引用
+    if (everything) everything.dispose();
     if (store) store.flush();
   });
 

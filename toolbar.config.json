@@ -136,5 +136,20 @@
     "ttsSid": 3,
     "autoSpeak": true,
     "autoSend": true
+  },
+  "dsh": {
+    "enabled": true,
+    "workspace": "dsh-workspace",
+    "port": 3080,
+    "startupTimeoutMs": 120000,
+    "telemetry": false
+  },
+  "search": {
+    "enabled": true,
+    "maxResults": 20,
+    "minChars": 2,
+    "timeoutMs": 1500,
+    "autoStart": true,
+    "sort": "NAME_ASCENDING"
   }
 }

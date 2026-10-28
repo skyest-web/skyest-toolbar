@@ -21,26 +21,26 @@ npm start
 ## 界面分区
 
 ```
-┌──────────┬───────────────────────────────────────┬──────────────┐
-│  顶栏    │  定位信息 · 组件 · 设置 · 退出（跨整屏）                         │
-├──────────┼─────────────────┬─────────────────────┼──────────────┤
-│          │ CPU GPU 内存 网络 磁盘（含曲线）        │  待办 / 便签 │
-│ 时钟     ├─────────────────┴─────────────────────┼──────────────┤
-│ 主机信息 │  音乐播放器（列表 · 歌词 · 频谱）        │  剪贴板历史  │
-├─────────────────────────────────────────────────┴──────────────┤
-│  分类导航 dock（横向手风琴：点分类 → 向右展宽）                  │
-└─────────────────────────────────────────────────────────────────┘
+grid.areas：4 列 × 4 行（左列 330px · 中间两列各 1fr · 右列 400px）
+          330px 左          中左 1fr            中右 1fr          400px 右
+32px      topbar ───────────────── 整行合并（搜索栏就住在这里）─────────────────
+176px     clock                   gauges ─────── 跨两列 ───────   workbench
+1fr       player                  slot1（占位）   slot2（占位）     clipboard
+78px      dock ───────────── 跨三列 ─────────                     clipboard（续）
 ```
 
-- **顶栏**：定位信息 + 「组件」（组件与位置面板，Ctrl+L）+ 「设置」（Ctrl+,）+ 「退出」。
-- **指标**：CPU、内存走 Node `os`；GPU 走 `nvidia-smi`（温度、占用、显存、功耗、风扇、核心频率）；网络速率与 Top 进程走 PowerShell `Get-NetAdapterStatistics` / `Get-Process`；磁盘走 `fs.statfs`。快慢两档轮询，避免每 1.5 秒起一次 PowerShell 进程。
+左列是「时钟与主机信息」在上、「音乐播放器」在下；播放器落在 330px 窄列里会自动切成紧凑排布（控制键两行、曲库占满宽、歌词只留一行字幕）。中间下排的两格 `slot1` / `slot2` 现在是虚线占位，等以后放新组件；指标那一行是固定 176px，窗口再高也不会被拉伸。
+
+- **顶栏**：常驻搜索栏（Everything 全盘文件名，Ctrl+F 聚焦，结果下拉挂在它下面）+ 定位信息 + 「组件」（组件与位置面板，Ctrl+L）+ 「设置」（Ctrl+,）+ 「退出」。
+- **文件搜索**：搜索栏在顶栏中间，输入文件名片段即出结果，回车用默认程序打开，↑↓ 选择、Esc 收起、点外面收起。索引由项目自带的便携版 Everything 做（`vendor/everything/`，普通权限、不出网），查询跑在独立工作进程里。详见 [docs/everything-search.md](docs/everything-search.md)。
+- **指标**：CPU、内存走 Node `os`；GPU 走 `nvidia-smi`（温度、占用、显存、功耗、风扇、核心频率）；网络速率与 Top 进程走 PowerShell `Get-NetAdapterStatistics` / `Get-Process`；磁盘走 `fs.statfs`。快慢两档轮询，避免每 1.5 秒起一次 PowerShell 进程。整块高度锁在 `grid.rows` 第二行（176px），`.gauge-row` 另有 `max-height` 兜底，换到更高的位置也只会留白、不会被拉长。
 - **剪贴板历史**：只存在内存，退出即清空，密码类内容不会落盘。点击条目重新复制。
 - **分类导航**：dock 按 `category` 聚成分类，每个分类平时是一条窄标签；点某个分类，它原地向右展宽铺开该分类的条目，其他分类同时收回（同 Element-UI `el-collapse` 的 `accordion`，方向从左到右），见下面「分类导航」。行尾的 ＋ 打开表单式管理面板，增删改入口和分类都不用手写 JSON。
-- **音乐播放器**：扫描 `music.folder`（含子目录，最深 4 层）里的 mp3 / flac / m4a / wav / ogg / opus / wma，文件名按 `序号 - 歌手 - 曲名` 自动拆分；同名同目录的 `.lrc` 会同步滚动高亮；底部频谱用 WebAudio `AnalyserNode` 实时绘制。空格键播放 / 暂停；当前曲目、进度、音量、循环与随机方式记在 `state.json`。换曲库不用进设置：播放器标题栏右侧的 📁 会弹原生文件夹选择框，选完写回 `toolbar.config.json` 并立刻重扫。
+- **音乐播放器**：扫描 `music.folder`（含子目录，最深 4 层）里的 mp3 / flac / m4a / wav / ogg / opus / wma，文件名按 `序号 - 歌手 - 曲名` 自动拆分；同名同目录的 `.lrc` 会同步滚动高亮；底部频谱用 WebAudio `AnalyserNode` 实时绘制。空格键播放 / 暂停；当前曲目、进度、音量、循环与随机方式记在 `state.json`。换曲库不用进设置：播放器标题栏右侧的 📁 会弹原生文件夹选择框，选完写回 `toolbar.config.json` 并立刻重扫。宽度 ≤420px 时（现在的左列）走 CSS 容器查询的紧凑版：控制键与音量分两行、曲库占满宽、歌词压成一行字幕、频谱降到 22px。
 
 ## 组件与位置
 
-界面由两层拼成：**位置（slot）** 固定，**组件（component）** 可换。位置就是 `layout.json` 里 `grid.areas` 画出来的那 7 个格子；每个格子里放哪个组件、放不放，由 `slots` 决定。顶栏「组件」按钮（或 Ctrl+L、设置页里的入口）打开面板：一行一个位置，左边是位置名，中间下拉选组件，右边「显示」开关。
+界面由两层拼成：**位置（slot）** 固定，**组件（component）** 可换。位置就是 `layout.json` 里 `grid.areas` 画出来的那 9 个格子；每个格子里放哪个组件、放不放，由 `slots` 决定。顶栏「组件」按钮（或 Ctrl+L、设置页里的入口）打开面板：一行一个位置，左边是位置名，中间下拉选组件，右边「显示」开关。
 
 - 把某个位置换成另一个已经在别处的组件时，**两个位置的组件自动对调**，格子数量不变，不会出现同一个组件被放到两处。
 - 取消「显示」→ 该位置在 `gridTemplateAreas` 里变成 `.`，区域留空，其他位置不动。
@@ -50,27 +50,30 @@ npm start
 ```jsonc
 {
   "grid": {
-    "columns": ["330px", "minmax(0, 1fr)", "400px"],   // CSS grid-template-columns
-    "rows": ["32px", "minmax(118px, 0.82fr)", "minmax(150px, 1.18fr)", "78px"],
-    "areas": [                                          // 每行是一个数组，长度必须等于列数
-      ["topbar", "topbar", "topbar"],
-      ["clock", "gauges", "workbench"],
-      ["clock", "player", "clipboard"],
-      ["dock", "dock", "clipboard"]
+    "columns": ["330px", "minmax(0, 1fr)", "minmax(0, 1fr)", "400px"],   // CSS grid-template-columns
+    "rows": ["32px", "176px", "minmax(150px, 1fr)", "78px"],             // 第二行是定值：指标卡的高度就锁在这里
+    "areas": [                                                          // 每行是一个数组，长度必须等于列数
+      ["topbar", "topbar", "topbar", "topbar"],
+      ["clock", "gauges", "gauges", "workbench"],
+      ["player", "slot1", "slot2", "clipboard"],
+      ["dock", "dock", "dock", "clipboard"]
     ]
   },
   "slots": [
     { "at": "topbar", "label": "顶栏（整行）", "module": "topbar", "enabled": true },
-    { "at": "clock", "label": "左侧竖条", "module": "clock", "enabled": true }
-    // gauges / workbench / player / clipboard / dock ...
+    { "at": "clock", "label": "左上：时钟与主机信息", "module": "clock", "enabled": true },
+    { "at": "player", "label": "左下：音乐播放器", "module": "player", "enabled": true }
+    // gauges / workbench / slot1 / slot2 / clipboard / dock ...
   ]
 }
 ```
 
 - `at` 必须是 `areas` 里出现过的区域名，且不能重复；`areas` 里每个区域都得有一个 slot。校验不过会打印原因并退回默认布局，不会白屏。
-- 想让某个位置跨行/跨列，就把它的名字在相邻格子里重复写（示例里 `clock` 占了三行）。
+- 区域名只允许 `/^[a-z][a-z0-9]*$/`：**不能带连字符**，所以占位格叫 `slot1` / `slot2` 而不是 `slot-a`。
+- 想让某个位置跨行/跨列，就把它的名字在相邻格子里重复写（示例里 `gauges` 横跨两列、`clipboard` 竖跨两行）。
+- `slot1` / `slot2` 现在挂的是内置的 `placeholder`（虚线框 + 位置名），想放真组件时在面板里把这一行的下拉换掉即可。
 - 老版本的 `modules: [{id, name, enabled}]` 仍然能读：加载时自动按「id 既是位置又是组件」迁移成 `slots`，下次保存就变成新格式。
-- 位置尺寸是固定的，把宽组件塞进窄格子（比如把指标卡放进左侧竖条）会挤成一列，属于预期行为——换完看一眼，不合适就换回来。
+- 位置尺寸是固定的，把宽组件塞进窄格子（比如把指标卡放进左列）会挤成一列，属于预期行为——换完看一眼，不合适就换回来。跑 `npm run layout:appprobe` 会量一遍每个格子有没有被裁。
 
 ## 加一个新组件
 
@@ -185,6 +188,7 @@ $lnk.Save()
 - **新放的组件在面板里选不到**：组件清单是启动时扫 `src/renderer/js/components/` 得到的，加完文件要重启一次；文件里有语法错误会导致该脚本加载失败，控制台会打 `[components] 加载失败：...`，其他组件照常加载。
 - **某个位置空着**：多半是 `slots.module` 指向了一个不存在的组件（改名、删文件），`layout.json` 里把它换掉或取消「显示」即可；控制台有 `[layout] 位置 "xxx" 引用的组件 "yyy" 不存在`。
 - **`npm run diag` 只截到壁纸**：Windows 的 DXGI 屏幕复制对某些副屏（尤其 USB 便携屏）会报 `Cannot initialize any DxgiOutputDuplicator instance`，此时 `desktopCapturer` 拿到的是没有窗口内容的桌面。要核对界面本身，用 DevTools 里 `capturePage` 或直接看那块屏。
+- **顶栏没有搜索栏**：设置里「文件搜索（Everything）」的「启用」被关了（`search.enabled=false` 时整条搜索栏不渲染，Ctrl+F 跟着失效），或这台机器不是 Windows。徽标显示「未连接」是 Everything 没在跑，点同一张卡片里的「重连并拉起 Everything」。
 - 主进程日志（目标屏、窗口尺寸）在终端里；渲染层日志需要 `npm run dev` 看 DevTools。
 
 ## 目录
@@ -197,6 +201,8 @@ src/main/          主进程：窗口与屏幕定位、IPC、轮询、track:// �
   layout.js        layout.json 读写 + slots/areas 校验 + v1 modules 自动迁移（不合法就退回默认）
   display.js       三种定位模式
   services/        metrics(CPU/GPU/网络/磁盘) · music(扫描 + .lrc 解析) · clipboard-history · store(待办便签播放状态) · launcher
+                   everything(搜索：主进程排队) · everything-worker(工作进程里调阻塞的 SDK) · everything-sdk(koffi 声明，不依赖 Electron)
+vendor/everything/ 便携版 Everything 客户端 + SDK DLL（ini/db 是运行时产物，不进 git）
 src/preload/       contextBridge，暴露 window.deskToolbar
                    （注意：不能叫 toolbar，window.toolbar 是 Chromium 内置属性，绑定会失败）
 src/renderer/      纯 DOM，无构建步骤
@@ -204,8 +210,11 @@ src/renderer/      纯 DOM，无构建步骤
   js/loader.js     启动时按 components/ 目录动态注入组件脚本，再 TB.app.boot()
   js/components/   一个文件一个组件（drop-in，放进目录就能在面板里选到）
   js/app.js        外壳：按 slots 生成 grid-template-areas、重建 section、分发 update
+  js/search.js     顶栏搜索栏 + 结果下拉（Everything）
   js/settings.js   设置面板      js/dock-editor.js   快捷方式面板
   js/layout-editor.js 组件与位置面板
 tools/diagnose.js  打印各屏真实参数并抓取原生截屏
+tools/everything-check.js / search-appprobe.js  搜索链路的无界面自检与 CDP 真机验证
+tools/layout-appprobe.js  量一遍格子：音乐在时钟下方、占位两格、指标不拉伸、搜索栏常驻（--shot 存 samples/layout-after.png）
 tools/make-demo-audio.js  合成 samples/demo 下的演示音频与歌词
 ```

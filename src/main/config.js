@@ -59,6 +59,19 @@ const DEFAULTS = {
     startupTimeoutMs: 120000,
     // 官方默认 FEEDBACK_ONLY 会把会话日志发到 deepseeksvc.com，按拍板关掉
     telemetry: false
+  },
+  // Everything 全盘文件搜索（vendor/everything 里的便携版 + SDK）。
+  // 一切查询都在工作进程里跑，出网为零：Everything 只读本机索引。
+  search: {
+    enabled: true,
+    maxResults: 20,
+    // 少于这个字数不发查询：单字符在全盘索引上又慢又没意义
+    minChars: 2,
+    // 阻塞调用堵住工作进程时，超过这么久就当这次没成功（渲染层还会再试最后一次输入）
+    timeoutMs: 1500,
+    // Everything 客户端没在跑时用 vendor 里的 exe 拉一个
+    autoStart: true,
+    sort: 'NAME_ASCENDING'
   }
 };
 
@@ -100,7 +113,8 @@ function save(appRoot, config) {
     music: config.music,
     ai: config.ai,
     voice: config.voice,
-    dsh: config.dsh
+    dsh: config.dsh,
+    search: config.search
   };
   fs.writeFileSync(file, `${JSON.stringify(ordered, null, 2)}\n`, 'utf8');
   return file;

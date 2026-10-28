@@ -79,6 +79,15 @@ contextBridge.exposeInMainWorld('deskToolbar', {
     onState: (handler) => on('dsh:state', handler)
   },
 
+  search: {
+    status: () => invoke('search:status'),
+    probe: () => invoke('search:probe'),
+    query: (text) => invoke('search:query', text),
+    open: (listId, index) => invoke('search:open', listId, index),
+    startHost: () => invoke('search:startHost'),
+    onState: (handler) => on('search:state', handler)
+  },
+
   app: {
     quit: () => invoke('app:quit'),
     relaunch: () => invoke('app:relaunch')

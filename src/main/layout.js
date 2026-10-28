@@ -7,22 +7,24 @@ const LAYOUT_FILE = 'layout.json';
 // 换位置 = 交换两个 slot 的 module；隐藏 = enabled:false，该区域留空。
 const DEFAULT_LAYOUT = {
   grid: {
-    columns: ['330px', 'minmax(0, 1fr)', '400px'],
-    rows: ['32px', 'minmax(118px, 0.82fr)', 'minmax(150px, 1.18fr)', '78px'],
+    columns: ['330px', 'minmax(0, 1fr)', 'minmax(0, 1fr)', '400px'],
+    rows: ['32px', '176px', 'minmax(150px, 1fr)', '78px'],
     areas: [
-      ['topbar', 'topbar', 'topbar'],
-      ['clock', 'gauges', 'workbench'],
-      ['clock', 'player', 'clipboard'],
-      ['dock', 'dock', 'clipboard']
+      ['topbar', 'topbar', 'topbar', 'topbar'],
+      ['clock', 'gauges', 'gauges', 'workbench'],
+      ['player', 'slot1', 'slot2', 'clipboard'],
+      ['dock', 'dock', 'dock', 'clipboard']
     ]
   },
   slots: [
     { at: 'topbar', label: '顶栏（整行）', module: 'topbar', enabled: true },
-    { at: 'clock', label: '左侧竖条', module: 'clock', enabled: true },
-    { at: 'gauges', label: '中部上', module: 'gauges', enabled: true },
-    { at: 'workbench', label: '中部右上', module: 'workbench', enabled: true },
-    { at: 'player', label: '中部下', module: 'player', enabled: true },
-    { at: 'clipboard', label: '右侧竖条', module: 'clipboard', enabled: true },
+    { at: 'clock', label: '左上：时钟与主机信息', module: 'clock', enabled: true },
+    { at: 'player', label: '左下：音乐播放器', module: 'player', enabled: true },
+    { at: 'gauges', label: '中部上：系统指标（固定高度）', module: 'gauges', enabled: true },
+    { at: 'workbench', label: '右上', module: 'workbench', enabled: true },
+    { at: 'slot1', label: '中下左：占位', module: 'placeholder', enabled: true },
+    { at: 'slot2', label: '中下右：占位', module: 'placeholder', enabled: true },
+    { at: 'clipboard', label: '右侧竖条', module: 'ai', enabled: true },
     { at: 'dock', label: '底部通栏', module: 'dock', enabled: true }
   ]
 };

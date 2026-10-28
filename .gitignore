@@ -6,3 +6,9 @@ state.json
 samples/
 *.log
 dist/
+# Everything 便携版跑起来后自己生成的索引与配置：几百 MB、跟机器绑定，不进 git
+vendor/everything/app/Everything.db
+vendor/everything/app/Everything.ini
+# SDK 自带示例的编译产物：我们只用 dll + 头文件，示例不构建
+vendor/everything/sdk/example/**/obj/
+*.suo

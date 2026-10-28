@@ -122,6 +122,8 @@ body:not(.ready) .shell {
 .clock-area {
   padding: 12px 14px;
   display: flex;
+  container-type: inline-size;
+  container-name: clock;
 }
 
 .clock-area #clock {
@@ -174,6 +176,27 @@ body:not(.ready) .shell {
   text-align: right;
 }
 
+/* 左列窄（时钟在上、播放器在下）时四条主机信息排两列，尽量把高度留给下面的播放器 */
+@container clock (max-width: 380px) {
+  .clock-time {
+    font-size: 3rem;
+  }
+  .clock-chips {
+    margin-top: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 8px;
+  }
+  .chip {
+    padding: 4px 7px;
+    gap: 6px;
+    font-size: 0.78rem;
+  }
+  .chip-value {
+    max-width: none;
+  }
+}
+
 /* ---------- gauges ---------- */
 .gauges {
   padding: 8px;
@@ -185,6 +208,7 @@ body:not(.ready) .shell {
   grid-auto-columns: minmax(0, 1fr);
   gap: 8px;
   height: 100%;
+  max-height: 158px;
 }
 
 .gauge {
@@ -503,6 +527,8 @@ body:not(.ready) .shell {
 .player-area {
   display: flex;
   flex-direction: column;
+  container-type: inline-size;
+  container-name: player;
 }
 
 .player-area #player {
@@ -714,6 +740,51 @@ body:not(.ready) .shell {
   flex: 0 0 34px;
   width: 100%;
   height: 34px;
+}
+
+/* 左列窄（330px）时的紧凑播放器：控制键与音量分两行，曲库占满宽度，歌词只留一行字幕 */
+@container player (max-width: 420px) {
+  .pl-head {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    column-gap: 8px;
+  }
+  .pl-meta {
+    flex: 1 1 100px;
+  }
+  .pl-side {
+    order: 3;
+    flex: 0 0 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .pl-volume {
+    width: 84px;
+  }
+  .pl-body {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .pl-list {
+    flex: 1 1 auto;
+    border-right: none;
+    padding-right: 2px;
+  }
+  .pl-lyrics {
+    flex: 0 0 22px;
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding: 0 4px;
+  }
+  .pl-spectrum {
+    flex: 0 0 22px;
+    height: 22px;
+  }
+  .pl-item-artist {
+    display: none;
+  }
 }
 
 /* ---------- dock ---------- */
@@ -1675,3 +1746,200 @@ input[type='checkbox'] {
   resize: vertical;
 }
 
+
+/* ---------- search：顶栏常驻搜索栏 + 结果下拉 ---------- */
+.search-bar {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 640px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.search-bar:focus-within {
+  border-color: var(--accent);
+}
+
+.search-icon {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.84rem;
+  padding: 0;
+}
+
+.search-input:focus {
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: #5d7386;
+}
+
+.search-badge {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.search-badge.ok {
+  color: var(--ok);
+}
+
+.search-badge.warn {
+  color: var(--warn);
+}
+
+/* 结果下拉：left/top/width/max-height 由 TB.search.place() 按输入框矩形写内联样式 */
+.search-panel {
+  position: fixed;
+  left: 12px;
+  top: 46px;
+  width: min(560px, calc(100vw - 24px));
+  max-height: calc(100vh - 58px);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+}
+
+.search-panel.hidden,
+.search-panel .hidden {
+  display: none;
+}
+
+.search-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 8px 9px 9px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+}
+
+.search-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.search-note {
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.search-note:not(.muted) {
+  color: var(--warn);
+}
+
+.search-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.search-row.active {
+  background: var(--panel-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.search-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+}
+
+.search-row.active .search-name {
+  color: var(--accent);
+}
+
+.search-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.search-meta {
+  font-size: 0.74rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.search-more {
+  padding: 4px 6px;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+/* ---------- placeholder ---------- */
+.placeholder {
+  display: flex;
+  background: transparent;
+  border-style: dashed;
+}
+
+.ph-inner {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.ph-title {
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+}
+
+.ph-hint {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  opacity: 0.8;
+}

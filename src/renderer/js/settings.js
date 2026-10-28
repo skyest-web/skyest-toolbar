@@ -244,6 +244,61 @@ TB.settings = {
     );
     voiceCard.dataset.card = 'voice';
 
+    // ----- 文件搜索（Everything） -----
+    const searchEnabled = this.checkbox(config.search.enabled);
+    const searchMax = this.number(config.search.maxResults, 1, 100, 5);
+    const searchMin = this.number(config.search.minChars, 1, 8, 1);
+    const searchTimeout = this.number(config.search.timeoutMs, 300, 10000, 100);
+    const searchAutoStart = this.checkbox(config.search.autoStart);
+    const searchSort = this.select(
+      [
+        ['NAME_ASCENDING', '名称 A→Z'],
+        ['PATH_ASCENDING', '路径 A→Z'],
+        ['SIZE_DESCENDING', '大的在前'],
+        ['DATE_MODIFIED_DESCENDING', '最近改动的在前']
+      ],
+      config.search.sort
+    );
+    const searchState = TB.search?.status || null;
+    const searchStatusHint = TB.util.el('span', {
+      class: 'field-hint',
+      text: !searchState
+        ? '状态未知：点一下顶栏搜索栏就能拿到'
+        : !searchState.supported
+          ? 'Everything 只有 Windows 版，这台机器上用不了'
+          : !searchState.installed
+            ? `没找到 vendor/everything 里的 SDK${searchState.lastError ? `（${searchState.lastError}）` : ''}`
+            : searchState.running && searchState.dbLoaded
+              ? `已连上 SDK ${searchState.sdkVersion || ''}${searchState.admin ? '（管理员索引）' : '（普通权限索引）'}`
+              : searchState.running
+                ? '已连上，但索引还没建完'
+                : `Everything 没在运行${searchState.lastError ? `（${searchState.lastError}）` : ''}`
+    });
+    const searchRetry = TB.util.el('button', {
+      class: 'ghost-btn',
+      text: '重连并拉起 Everything',
+      onclick: async () => {
+        const result = await TB.api.search.startHost();
+        TB.search?.applyStatus?.(result.status);
+        searchStatusHint.textContent = result.ok
+          ? '已连上，具体看顶栏搜索栏右侧的徽标'
+          : `拉起失败：${result.message || 'Everything 没回应'}`;
+      }
+    });
+
+    const searchCard = this.card(
+      '文件搜索（Everything）',
+      this.field('启用', searchEnabled, '关掉后顶栏不显示搜索栏，Ctrl+F 也一起失效'),
+      this.field('连接状态', searchStatusHint, '查询全走本机 Everything 的 IPC，不出网'),
+      this.field('最多返回', searchMax, '一次取回多少条；下拉里可以滚动看完，总数超出时底部提示还有多少'),
+      this.field('最少字数', searchMin, '少于这个字数不发查询：单字符在全盘索引上又慢又没意义'),
+      this.field('单次超时 (ms)', searchTimeout, '阻塞调用堵住工作进程时，超过这么久算这次没成功'),
+      this.field('没运行就拉起', searchAutoStart, '首次查询撞见 Everything 没在跑，就用项目里的便携版把它带起来再重试一次'),
+      this.field('排序', searchSort),
+      this.field('重连', searchRetry)
+    );
+    searchCard.dataset.card = 'search';
+
     // ----- 组件与位置（layout.json 的 slots） -----
     const visibleCount = layout.slots.filter((slot) => slot.enabled && slot.module).length;
     const gridSummary = `${layout.grid.columns.length} 列 × ${layout.grid.rows.length} 行`;
@@ -326,7 +381,7 @@ TB.settings = {
       TB.util.el('div', { class: 'settings-grid' }, [
         screenCard,
         refreshCard,
-        TB.util.el('div', { class: 'card-col' }, [musicCard, aiCard, voiceCard, moduleCard]),
+        TB.util.el('div', { class: 'card-col' }, [musicCard, aiCard, voiceCard, searchCard, moduleCard]),
         dockCard
       ]),
       TB.util.el('div', { class: 'settings-footer' }, [
@@ -376,6 +431,15 @@ TB.settings = {
               ttsSid: Math.round(TB.util.clamp(Number(voiceSid.value), 0, (Number(TB.voice?.status?.tts?.numSpeakers) || 103) - 1)),
               autoSpeak: voiceAutoSpeak.checked,
               autoSend: voiceAutoSend.checked
+            };
+            config.search = {
+              ...config.search,
+              enabled: searchEnabled.checked,
+              maxResults: Math.round(TB.util.clamp(Number(searchMax.value), 1, 100)),
+              minChars: Math.round(TB.util.clamp(Number(searchMin.value), 1, 8)),
+              timeoutMs: Math.round(TB.util.clamp(Number(searchTimeout.value), 300, 10000)),
+              autoStart: searchAutoStart.checked,
+              sort: searchSort.value
             };
             // dock 与 layout 分别由「快捷方式管理」「组件与位置」面板即时写入，
             // 这里不带着旧副本，避免覆盖那边的改动

@@ -11,11 +11,13 @@ TB.app = {
     this.nodes.settings = document.getElementById('settings');
     this.nodes.dockEditor = document.getElementById('dock-editor');
     this.nodes.layoutEditor = document.getElementById('layout-editor');
+    this.nodes.searchPanel = document.getElementById('search-panel');
     this.nodes.toast = document.getElementById('toast');
     TB.settings.init(this.nodes.settings);
     TB.dockEditor.init(this.nodes.dockEditor);
     TB.layoutEditor.init(this.nodes.layoutEditor);
     TB.dsh.init();
+    TB.search.init(this.nodes.searchPanel);
     this.bindKeys();
 
     const info = await TB.api.boot();
@@ -157,6 +159,10 @@ TB.app = {
       if (event.key === 'l' && (event.ctrlKey || event.altKey)) {
         event.preventDefault();
         TB.layoutEditor.open();
+      }
+      if (event.key === 'f' && (event.ctrlKey || event.altKey)) {
+        event.preventDefault();
+        TB.search.focus();
       }
       if (event.key === ' ' && event.target === document.body) {
         event.preventDefault();
