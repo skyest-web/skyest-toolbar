@@ -108,3 +108,22 @@ npm run agent:appprobe -- --shot      # 宠物经 search_files 查本机索引�
   `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/main-error-dialog.ps1`
 - **Everything 的 ini 会吃反斜杠**：写 `folders="D:\GitProject"` 会被它改写成 `folders="D:GitProject"`。走 NTFS 卷全量索引这条路不用碰这个键，要精确控制文件夹索引时再验证转义写法。
 - 收尾时**不主动关 Everything 客户端**：它是常驻索引服务，跟着工具栏一起起落没意义，退出只 `dispose()` 工作进程。
+
+## 8. 选型补记
+
+功能已经落地，这一节只留两样查过一次就不该再查的东西：官方页的原文事实，和为什么不选别的。
+
+**官方 SDK 页（voidtools 中文站 `support/everything/sdk/`）核验到的**：SDK 是「一个基础的 IPC 包装器」，通过 IPC（含 `WM_COPYDATA`）代理到 Everything；**需要 Everything 正在运行**——它自己不带索引能力；线程安全；支持阻塞与非阻塞两种模式；ANSI/Unicode、x86 与 x64 都有。`Everything-SDK.zip` 是**单独一个下载包**（实测 238,231 字节），不随 Everything.exe 装进目录。
+
+放弃的四条，各自的原因：
+
+- **`es.exe`（命令行客户端）**：每敲一个字 spawn 一个进程，或者得把它注册成服务；输出是纯文本，路径里的空格、引号、控制台代码页都要自己切。它是给批量导出用的，不适合一个输入即查的搜索栏。
+- **Everything 内置 HTTP 服务器**：要选端口、要用户在 Options 里手动勾上（默认关）、本地多开一个监听，而且这一项在官方目录里挂在 1.5 那一支下面。为了拿几个文件名付这个代价不值。
+- **npm 上的封装包 / Everything MCP server**：扒开看内部仍是 dlopen 同一个 `Everything64.dll`。为一个七八个函数的接口引入第三方依赖，还要跟着它适配 SDK3 的变更，是净负债。
+- **1.5 的 SDK3（`Everything3.dll` + 命名管道）**：1.5 把通信换成了 `\\.\pipe\Everything IPC (1.5a)`，社区里明确记录这条管道只对 High-IL（提权）进程开放；工具栏跑在普通权限，接不上的表现是静默查不到东西。加上 1.5 仍是 alpha、DLL 名和调用约定都不同。所以只打 1.4 的 `Everything64.dll`（窗口消息 IPC）。
+
+**开工前那份预研里，被实现推翻的三点**——下次做同类选型别再照它们拍：
+
+1. 「第三方二进制不进 git，用 `tools/*-install.js` 现拉」（照 `install-voice.js` 的样子）。实际是整套 SDK 连便携版 `everything.exe` 一起进了 `vendor/`：换机器 clone 完直接能跑，比多一个安装脚本省事。代价是仓库里跟着 13k 行 SDK 示例代码（`sdk/example/`、`sdk/vs/`、`sdk/src/`），真要瘦身可以只留 `dll/` 和 `include/`。
+2. 「本机没装 Everything，是硬前置，要先征得同意装」。便携版进 `vendor/` 之后这条前置根本不存在了，还顺手解决了「用户没装 Everything 就得降级」的一大套状态码。
+3. 「DLL 按四级回退顺序找 + 配置项覆盖」。实际是一个固定的 `vendor/everything/sdk/dll/Everything64.dll`，加上没在跑时用 `vendor/…/everything.exe` 自己带起来（`search.autoStart`）。少三个分叉，出问题时要看的地方就少了三个。
