@@ -193,6 +193,9 @@ function registerIpc() {
     clipboard: clipboardHistory.list(),
     ai: { messages: aiChat.messages, key: aiKey.status() },
     voice: voice ? voice.status() : null,
+    // 当前面板存 state.json（userData），不进 layout.json：切面板是运行时行为，
+    // 不该让跟着 git 走的布局文件每次切换都脏一次
+    page: store.get('activePage'),
     placement,
     displays: displayResolver.list(),
     components: componentFiles(),
@@ -221,6 +224,15 @@ function registerIpc() {
     if (result.errors) return result;
     layout = layoutStore.load(APP_ROOT);
     return { layout, file: result.file };
+  });
+
+  // 只认 layout 里真的存在的面板 id：渲染层递来一个陌生 id（旧 state.json、手改的文件）就忽略，
+  // 别把无效值存回去，否则下次启动 boot 读到一个不存在的面板，界面直接空一半
+  ipcMain.handle('page:set', (_event, pageId) => {
+    const id = String(pageId || '');
+    if (!layout.pages.some((page) => page.id === id)) return { ok: false, message: `没有面板 "${id}"` };
+    store.set('activePage', id);
+    return { ok: true, page: id };
   });
 
   ipcMain.handle('displays:list', () => displayResolver.list());

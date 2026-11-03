@@ -7,6 +7,7 @@
 | 主题 | 文件 |
 |---|---|
 | 整体布局与快速开始 | [README.md](README.md) |
+| 多面板（主界面/游戏/工作/生活）与 layout.json v2 | [docs/page-panels.md](docs/page-panels.md) |
 | AI 对话 + 桌宠（含手势表） | [docs/ai-pet-panel.md](docs/ai-pet-panel.md) |
 | 语音链路（ASR/TTS） | [docs/voice-module.md](docs/voice-module.md) |
 | DeepSeek Harness（dsh）窗口 | [docs/dsh-panel.md](docs/dsh-panel.md) |
@@ -27,7 +28,7 @@
 | 主进程 AI/流式 | `npm run test:ai`（零依赖 mock，55 项；L 段是工具调用那圈） |
 | dsh 子进程 | `npm run dsh:check` |
 | 界面/手势/dsh 窗口 | 带 `--remote-debugging-port=9223` 起应用，再 `node tools/dsh-appprobe.js 9223 --shot` 或 `node tools/voice-appprobe.js 9223 --shot` |
-| 布局（`layout.json` / grid / 组件与位置） | `npm run layout:appprobe -- 9223 --shot`（等价 `node tools/layout-appprobe.js 9223 --shot`）：逐格量「内容高度 vs 位置高度」，抓底部被 `.area{overflow:hidden}` 裁掉的那类溢出；截图落 `samples/layout-after.png` |
+| 布局（`layout.json` / grid / 面板 / 组件与位置） | `npm run layout:appprobe -- 9223 --shot`（等价 `node tools/layout-appprobe.js 9223 --shot`）：逐格量「内容高度 vs 位置高度」，抓底部被 `.area{overflow:hidden}` 裁掉的那类溢出；再**逐个点顶栏 tab** 验四个面板——常驻三格不许动、配置里 enabled 的位置要和 DOM 挂的组件一一对上、页签高亮跟得上，每页存一张 `samples/layout-page-<id>.png`，末尾把当前面板切回原值 |
 | Everything 搜索 | `npm run everything:check`（无界面，含 size/时间数值抽查）+ 带调试端口起应用后 `npm run search:appprobe -- --shot`（顶栏搜索栏常驻、下拉锚定、Ctrl+F/Esc、越界序号被拒、`search.enabled` 关掉后整条栏消失并能恢复，都在这条里） |
 | 宠物调本机工具（`search_files`） | `npm run agent:appprobe -- --shot`（真发一次 DeepSeek 请求：开关生效、`ai:tool` 提示行、回答里的路径本机真存在、工具轮次不落盘、退出时把配置恢复原值）；`--check` 只看前置不动配置 |
 | AI 面板几何（气泡/浮层会不会被裁、被盖） | `npm run ai:appprobe -- 9223 --reload --shot [--height 420]`：四种状态（都收起/打字浮层/完整对话/两个都开）各量一遍，断言气泡挂在 body 上、还在窗口里、贴着宠物头顶，外加「宠物头顶不被格子上沿裁」「打字浮层不盖面板里任何东西」「聊天列表自己被压住」；末尾还验气泡的「读完三秒收起」（借 `TB.voice.setSpeaking` 模拟朗读中/结束）；`--reload` 改完渲染层不用重启应用 |
@@ -49,7 +50,10 @@
 - **应用"起来了却没反应"先怀疑主进程弹了错误框**：症状是进程在、`MainWindowTitle=Error`、CDP 的 `/json/list` 挂住、`run.log` 干干净净。栈只在那个模态框里，读它：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/main-error-dialog.ps1`。
 - **koffi 的 out 参数不能传 JS 数组**（不报错但永远读不回值，表现是数值字段静默归零），要 `koffi.alloc(type,1)` + `koffi.decode(ptr,type)`；所以搜索结果的 size/修改时间是自检脚本的必查项。见 `everything-sdk.js` 的 `readOut()`。
 - **grid 区域名不许带连字符**：`layout.js` 的校验用 `/^[a-z][a-z0-9]*$/`（CSS grid-template-areas 的 token 规则），`slot-1` 会整份布局被打回默认。占位格叫 `slot1` / `slot2`。
-- **一个组件挂两个位置时，只有最后一个位置拿得到刷新**：`buildShell()` 用 `this.nodes[slot.module]` 做键，`placeholder` 占两格没问题（它没有 `update`），但以后往两格里放**有 update 的**组件必须先改这个键控方式。
+- **一个组件挂两个位置时，只有最后一个位置拿得到刷新**：`buildShell()` 用 `this.nodes[slot.module]` 做键，`placeholder` 占两格没问题（它没有 `update`），但以后往两格里放**有 update 的**组件必须先改这个键控方式。跨面板重复挂是允许的（同一时刻只渲染一页），同一页 + 常驻这个范围内不行——「组件与位置」面板靠对调来保证这点。
+- **layout.json 是 v2：`grid` + `shared` + `pages[]`，顶层没有 `slots` 了**。渲染层要拿「当前画面上该有哪些格子」只能走 `TB.app.effectiveSlots()`（= shared + 当前页 slots），再写 `state.grid.slots` 就是 undefined（`settings.js` 和 `layout-appprobe` 都改过一次）。v1 那份顶层 `slots` 加载时自动迁移，别在迁移里丢掉用户改过的常驻格。
+- **当前面板 id 存 `state.json` 的 `activePage`，不存 layout.json**：layout.json 跟着 git 走，切一次面板就脏一次工作区。`page:set` 只认 layout 里存在的 id，陌生 id 返回 `{ok:false}` 不落盘。
+- **切面板 = `buildShell()` 整体重建**，和存布局、存配置是同一条路径。所以组件不能持有「只在 DOM 里存在」的状态：`<audio>` 挂 body、搜索栏每次 `init` 重新 `attachBar`、`dock.init` 把 `signature` 置 null、对话历史在 `TB.app.state.ai`。新组件忘了这点，表现就是切页后它失忆。
 - **窄列变体走 CSS 容器查询**，不是媒体查询：`.area` 上 `container-type: inline-size` + `container-name`，`@container clock (max-width: 380px)` / `@container player (max-width: 420px)`。格子宽度来自固定的 grid 轨道，所以容器查询是可靠的；窗口宽度变化不影响判断。加了新变体就要在 `layout-appprobe` 里断言容器查询真的生效（像 `playerContainer` / `chipsPerRow` 那样）。
 - **`config.search.enabled` 由 `topbar.js` 的 `build()` 消费**（关掉时整条搜索栏不渲染，Ctrl+F 跟着失效），不是渲染层面板里的开关——别把它改回只写不读。
 - **`contextFor()` 会自己把当前这句补成最后一条 user**：`send()` 必须先取上下文、再 `this.messages.push(...)`。反过来就是每个请求把用户那句话发两遍（`ai-mock-test` 的 L15 守着）。

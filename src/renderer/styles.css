@@ -94,6 +94,41 @@ body:not(.ready) .shell {
   gap: 8px;
 }
 
+/* ---------- 面板切换 tab（主界面 / 游戏 / 工作 / 生活）---------- */
+.page-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.page-tab {
+  height: 22px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.page-tab:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.page-tab.active {
+  background: var(--panel);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .muted {
   color: var(--muted);
   font-size: 0.8rem;

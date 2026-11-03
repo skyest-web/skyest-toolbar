@@ -39,47 +39,11 @@
       ]
     ]
   },
-  "slots": [
+  "shared": [
     {
       "at": "topbar",
       "label": "顶栏（整行）",
       "module": "topbar",
-      "enabled": true
-    },
-    {
-      "at": "clock",
-      "label": "左上：时钟与主机信息",
-      "module": "clock",
-      "enabled": true
-    },
-    {
-      "at": "player",
-      "label": "左下：音乐播放器",
-      "module": "player",
-      "enabled": true
-    },
-    {
-      "at": "gauges",
-      "label": "中部上：系统指标（固定高度）",
-      "module": "gauges",
-      "enabled": true
-    },
-    {
-      "at": "workbench",
-      "label": "右上",
-      "module": "clipboard",
-      "enabled": true
-    },
-    {
-      "at": "slot1",
-      "label": "中下左：占位",
-      "module": "workbench",
-      "enabled": true
-    },
-    {
-      "at": "slot2",
-      "label": "中下右：占位",
-      "module": "placeholder",
       "enabled": true
     },
     {
@@ -93,6 +57,176 @@
       "label": "底部通栏",
       "module": "dock",
       "enabled": true
+    }
+  ],
+  "pages": [
+    {
+      "id": "home",
+      "name": "主界面",
+      "slots": [
+        {
+          "at": "clock",
+          "label": "左上：时钟与主机信息",
+          "module": "clock",
+          "enabled": true
+        },
+        {
+          "at": "gauges",
+          "label": "中部上：系统指标（固定高度）",
+          "module": "gauges",
+          "enabled": true
+        },
+        {
+          "at": "workbench",
+          "label": "右上",
+          "module": "clipboard",
+          "enabled": true
+        },
+        {
+          "at": "player",
+          "label": "左下：音乐播放器",
+          "module": "player",
+          "enabled": true
+        },
+        {
+          "at": "slot1",
+          "label": "中下左：占位",
+          "module": "workbench",
+          "enabled": true
+        },
+        {
+          "at": "slot2",
+          "label": "中下右：占位",
+          "module": "placeholder",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "game",
+      "name": "游戏面板",
+      "slots": [
+        {
+          "at": "clock",
+          "label": "左上：时钟与主机信息",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "gauges",
+          "label": "中部上：系统指标（固定高度）",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "workbench",
+          "label": "右上",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "player",
+          "label": "左下：音乐播放器",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "slot1",
+          "label": "中下左：占位",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "slot2",
+          "label": "中下右：占位",
+          "module": "placeholder",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "work",
+      "name": "工作面板",
+      "slots": [
+        {
+          "at": "clock",
+          "label": "左上：时钟与主机信息",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "gauges",
+          "label": "中部上：系统指标（固定高度）",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "workbench",
+          "label": "右上",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "player",
+          "label": "左下：音乐播放器",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "slot1",
+          "label": "中下左：占位",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "slot2",
+          "label": "中下右：占位",
+          "module": "placeholder",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "life",
+      "name": "生活面板",
+      "slots": [
+        {
+          "at": "clock",
+          "label": "左上：时钟与主机信息",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "gauges",
+          "label": "中部上：系统指标（固定高度）",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "workbench",
+          "label": "右上",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "player",
+          "label": "左下：音乐播放器",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "slot1",
+          "label": "中下左：占位",
+          "module": "placeholder",
+          "enabled": true
+        },
+        {
+          "at": "slot2",
+          "label": "中下右：占位",
+          "module": "placeholder",
+          "enabled": true
+        }
+      ]
     }
   ]
 }

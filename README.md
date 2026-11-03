@@ -23,7 +23,7 @@ npm start
 ```
 grid.areas：4 列 × 4 行（左列 330px · 中间两列各 1fr · 右列 400px）
           330px 左          中左 1fr            中右 1fr          400px 右
-32px      topbar ───────────────── 整行合并（搜索栏就住在这里）─────────────────
+32px      topbar ──────── 整行合并（面板 tab 与搜索栏住在这里）────────────────
 176px     clock                   gauges ─────── 跨两列 ───────   workbench
 1fr       player                  slot1（占位）   slot2（占位）     clipboard
 78px      dock ───────────── 跨三列 ─────────                     clipboard（续）
@@ -31,7 +31,9 @@ grid.areas：4 列 × 4 行（左列 330px · 中间两列各 1fr · 右列 400p
 
 左列是「时钟与主机信息」在上、「音乐播放器」在下；播放器落在 330px 窄列里会自动切成紧凑排布（控制键两行、曲库占满宽、歌词只留一行字幕）。中间下排的两格 `slot1` / `slot2` 现在是虚线占位，等以后放新组件；指标那一行是固定 176px，窗口再高也不会被拉伸。
 
-- **顶栏**：常驻搜索栏（Everything 全盘文件名，Ctrl+F 聚焦，结果下拉挂在它下面）+ 定位信息 + 「组件」（组件与位置面板，Ctrl+L）+ 「设置」（Ctrl+,）+ 「退出」。
+这张格子图是**四个面板共用**的：顶栏、右侧桌宠、底部快捷入口是常驻位置，切面板不动；其余六格每个面板各配一套，顶栏那排 tab（主界面 / 游戏面板 / 工作面板 / 生活面板）切的就是它。现在只有主界面填了东西，另外三个面板是六格空白占位，等你在「组件与位置」里挑。机制见 [docs/page-panels.md](docs/page-panels.md)。
+
+- **顶栏**：面板 tab + 常驻搜索栏（Everything 全盘文件名，Ctrl+F 聚焦，结果下拉挂在它下面）+ 定位信息 + 「组件」（组件与位置面板，Ctrl+L）+ 「设置」（Ctrl+,）+ 「退出」。
 - **文件搜索**：搜索栏在顶栏中间，输入文件名片段即出结果，回车用默认程序打开，↑↓ 选择、Esc 收起、点外面收起。索引由项目自带的便携版 Everything 做（`vendor/everything/`，普通权限、不出网），查询跑在独立工作进程里。详见 [docs/everything-search.md](docs/everything-search.md)。
 - **指标**：CPU、内存走 Node `os`；GPU 走 `nvidia-smi`（温度、占用、显存、功耗、风扇、核心频率）；网络速率与 Top 进程走 PowerShell `Get-NetAdapterStatistics` / `Get-Process`；磁盘走 `fs.statfs`。快慢两档轮询，避免每 1.5 秒起一次 PowerShell 进程。整块高度锁在 `grid.rows` 第二行（176px），`.gauge-row` 另有 `max-height` 兜底，换到更高的位置也只会留白、不会被拉长。
 - **剪贴板历史**：只存在内存，退出即清空，密码类内容不会落盘。点击条目重新复制。
@@ -41,12 +43,13 @@ grid.areas：4 列 × 4 行（左列 330px · 中间两列各 1fr · 右列 400p
 
 ## 组件与位置
 
-界面由两层拼成：**位置（slot）** 固定，**组件（component）** 可换。位置就是 `layout.json` 里 `grid.areas` 画出来的那 9 个格子；每个格子里放哪个组件、放不放，由 `slots` 决定。顶栏「组件」按钮（或 Ctrl+L、设置页里的入口）打开面板：一行一个位置，左边是位置名，中间下拉选组件，右边「显示」开关。
+界面由三层拼成：**骨架（grid）** 固定，**位置（slot）** 分常驻和可换，**组件（component）** 可换。骨架就是 `layout.json` 里 `grid.areas` 画出来的那 9 个格子，四个面板共用同一张；顶栏、右侧桌宠、底部快捷入口是**常驻位置**（`shared`），在哪个面板都在原地；剩下六格（`clock` / `gauges` / `workbench` / `player` / `slot1` / `slot2`）每个面板各配一套（`pages[]`）。顶栏那排 tab 切面板，「组件」按钮（或 Ctrl+L、设置页里的入口）打开配置面板：顶部先选**要编辑哪个面板**，下面一行一个位置，左边是位置名，中间下拉选组件，右边「显示」开关。机制与约定见 [docs/page-panels.md](docs/page-panels.md)。
 
-- 把某个位置换成另一个已经在别处的组件时，**两个位置的组件自动对调**，格子数量不变，不会出现同一个组件被放到两处。
+- 把某个位置换成另一个已经在别处的组件时，**两个位置的组件自动对调**，格子数量不变，不会出现同一个组件在同一画面里被放到两处。选「空白占位」不对调（它就是「清空」的意思）。
 - 取消「显示」→ 该位置在 `gridTemplateAreas` 里变成 `.`，区域留空，其他位置不动。
 - 下拉里选「（空着不显示）」= 把这个位置清空，组件退回右侧「可用组件」池子。
-- 点「保存并应用」写回 `layout.json` 并立刻重建界面，不用重启；「恢复默认」把 slots 还原成出厂配置。
+- 点「保存并应用」写回 `layout.json` 并立刻重建界面，不用重启；「恢复默认」把当前编辑的那个面板连同常驻位置还原成出厂配置。
+- **当前在哪个面板不写进 `layout.json`**（那文件跟着 git 走），它存 `state.json` 的 `activePage`，重启后回到你上次待着的面板。
 
 ```jsonc
 {
@@ -60,21 +63,33 @@ grid.areas：4 列 × 4 行（左列 330px · 中间两列各 1fr · 右列 400p
       ["dock", "dock", "dock", "clipboard"]
     ]
   },
-  "slots": [
+  "shared": [                                                           // 常驻：所有面板共用，切页不动
     { "at": "topbar", "label": "顶栏（整行）", "module": "topbar", "enabled": true },
-    { "at": "clock", "label": "左上：时钟与主机信息", "module": "clock", "enabled": true },
-    { "at": "player", "label": "左下：音乐播放器", "module": "player", "enabled": true }
-    // gauges / workbench / slot1 / slot2 / clipboard / dock ...
+    { "at": "clipboard", "label": "右侧竖条", "module": "ai", "enabled": true },
+    { "at": "dock", "label": "底部通栏", "module": "dock", "enabled": true }
+  ],
+  "pages": [                                                            // 每个面板一套可换位置
+    {
+      "id": "home", "name": "主界面",
+      "slots": [
+        { "at": "clock", "label": "左上：时钟与主机信息", "module": "clock", "enabled": true },
+        { "at": "player", "label": "左下：音乐播放器", "module": "player", "enabled": true }
+        // gauges / workbench / slot1 / slot2 ...
+      ]
+    },
+    { "id": "game", "name": "游戏面板", "slots": [ /* 六格，同上 */ ] },
+    { "id": "work", "name": "工作面板", "slots": [ /* ... */ ] },
+    { "id": "life", "name": "生活面板", "slots": [ /* ... */ ] }
   ]
 }
 ```
 
-- `at` 必须是 `areas` 里出现过的区域名，且不能重复；`areas` 里每个区域都得有一个 slot。校验不过会打印原因并退回默认布局，不会白屏。
+- `at` 必须是 `areas` 里出现过的区域名，且不能重复；`areas` 里每个区域都得有 slot——要么在 `shared` 里，要么在每个面板的 `slots` 里，两边不能重复声明。校验不过会打印原因并退回默认布局，不会白屏。
 - 区域名只允许 `/^[a-z][a-z0-9]*$/`：**不能带连字符**，所以占位格叫 `slot1` / `slot2` 而不是 `slot-a`。
 - 想让某个位置跨行/跨列，就把它的名字在相邻格子里重复写（示例里 `gauges` 横跨两列、`clipboard` 竖跨两行）。
 - `slot1` / `slot2` 现在挂的是内置的 `placeholder`（虚线框 + 位置名），想放真组件时在面板里把这一行的下拉换掉即可。
-- 老版本的 `modules: [{id, name, enabled}]` 仍然能读：加载时自动按「id 既是位置又是组件」迁移成 `slots`，下次保存就变成新格式。
-- 位置尺寸是固定的，把宽组件塞进窄格子（比如把指标卡放进左列）会挤成一列，属于预期行为——换完看一眼，不合适就换回来。跑 `npm run layout:appprobe` 会量一遍每个格子有没有被裁。
+- 老文件仍然能读：只有一份顶层 `slots` 的 v1、以及更早的 `modules: [{id, name, enabled}]`，加载时自动迁移——常驻那三格（按原值，你换过的组件不会被出厂默认盖掉）进 `shared`，其余归进「主界面」，另外三个面板补成空白占位，下次保存就落成 v2。
+- 位置尺寸是固定的，把宽组件塞进窄格子（比如把指标卡放进左列）会挤成一列，属于预期行为——换完看一眼，不合适就换回来。跑 `npm run layout:appprobe` 会四个面板各量一遍每个格子有没有被裁。
 
 ## 加一个新组件
 

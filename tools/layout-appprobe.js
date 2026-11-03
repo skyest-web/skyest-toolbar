@@ -1,8 +1,9 @@
 // 布局的真机验证：附着到真实运行的工具栏（需带 --remote-debugging-port 启动），
-// 只读地量一遍四条要求：音乐在时钟下方、原音乐位拆两格、系统指标不被拉伸、搜索是常驻栏。
+// 量「音乐在时钟下方、原音乐位拆两格、系统指标不被拉伸、搜索是常驻栏」，
+// 再逐个点顶栏面板 tab：常驻那几格切页不许动、每格配置要和 DOM 对上、内容不许被裁。
 // 用法（Git Bash）:
 //   1) ./node_modules/electron/dist/electron.exe . --remote-debugging-port=9223
-//   2) node tools/layout-appprobe.js [端口] [--shot]   # --shot 顺带存一张 samples/layout-after.png
+//   2) node tools/layout-appprobe.js [端口] [--shot]   # --shot 存 samples/layout-after.png 和每页一张 layout-page-<id>.png
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
@@ -81,10 +82,10 @@ const EXPRESSION = `(() => {
   return JSON.stringify({
     viewport: { width: window.innerWidth, height: window.innerHeight },
     layout: TB.app.state.grid,
-    areas: {
-      topbar: box('topbar'), clock: box('clock'), player: box('player'), gauges: box('gauges'),
-      workbench: box('workbench'), slot1: box('slot1'), slot2: box('slot2'), clipboard: box('clipboard'), dock: box('dock')
-    },
+    activePage: TB.app.state.page,
+    // 逐格从真实 DOM 取，别写死格子名：面板一多，写死的清单会漏掉新页里挂上来的组件
+    areas: Object.fromEntries([...document.querySelectorAll('#shell > section[data-slot]')].map((sec) => [sec.dataset.slot, box(sec.dataset.slot)])),
+    tabs: [...document.querySelectorAll('.topbar .page-tab')].map((b) => ({ page: b.dataset.page, text: b.textContent.trim(), active: b.classList.contains('active') })),
     shellOverflow: Math.round(shell.scrollHeight - shellRect.height),
     bodyOverflow: Math.round(document.documentElement.scrollHeight - window.innerHeight),
     gaugeRowHeight: gaugeRow ? Math.round(gaugeRow.getBoundingClientRect().height) : null,
@@ -128,6 +129,26 @@ async function main() {
   for (const [at, box] of Object.entries(a)) console.log(`${at.padEnd(10)} ${box ? `${box.module.padEnd(11)} ${box.w}x${box.h} @(${box.x},${box.y}) 内容${box.content} 溢出${box.overflowY}` : '缺失'}`);
 
   const failures = [];
+  // 逐格量「内容高度 vs 位置高度」——.area 是 overflow:hidden，超了不报错、只是看不见
+  const overflowOf = (areas, tag) => {
+    for (const [at, box] of Object.entries(areas)) {
+      if (box && box.content > box.h + 1) failures.push(`「${at}」(${tag}) 内容比位置高 ${box.content - box.h}px，会被裁掉`);
+      if (box && box.overflowY > 1) failures.push(`「${at}」(${tag}) 内容比自己的可视区高 ${box.overflowY}px，底部被裁掉了`);
+    }
+  };
+  // 配置里 enabled 的位置，DOM 上必须挂着同一个组件；DOM 也不许多挂
+  const slotsMatchDom = (measured, tag) => {
+    const page = measured.layout.pages.find((item) => item.id === measured.activePage);
+    const want = [...measured.layout.shared, ...(page?.slots || [])].filter((slot) => slot.enabled && slot.module);
+    for (const slot of want) {
+      const box = measured.areas[slot.at];
+      if (!box) failures.push(`${tag}：配置里「${slot.at}」要放 "${slot.module}"，DOM 上没有这一格`);
+      else if (box.module !== slot.module) failures.push(`${tag}：「${slot.at}」DOM 上挂的是 "${box.module}"，配置写的是 "${slot.module}"`);
+    }
+    const extra = Object.keys(measured.areas).filter((at) => !want.some((slot) => slot.at === at));
+    if (extra.length) failures.push(`${tag}：DOM 上多挂了 ${extra.join('、')}，layout.json 里没有`);
+  };
+
   if (out.shellOverflow > 1 || out.bodyOverflow > 1) failures.push(`网格整体超出窗口：shell+${out.shellOverflow} body+${out.bodyOverflow}`);
   if (!a.clock || !a.player) failures.push('左列没有时钟或播放器');
   else {
@@ -146,15 +167,64 @@ async function main() {
       failures.push(`两格挂了同一个「${a.slot1.module}」：一个组件两个位置时只有最后一个拿得到刷新`);
     }
   }
-  for (const [at, box] of Object.entries(a)) {
-    if (box && box.content > box.h + 1) failures.push(`「${at}」内容比位置高 ${box.content - box.h}px，会被裁掉`);
-    if (box && box.overflowY > 1) failures.push(`「${at}」内容比自己的可视区高 ${box.overflowY}px，底部被裁掉了`);
-  }
+  overflowOf(a, out.activePage);
+  slotsMatchDom(out, `面板 "${out.activePage}"`);
   if (a.gauges && out.gaugeRowHeight > a.gauges.h) failures.push(`系统指标被拉伸：行 ${a.gauges.h} 里内容 ${out.gaugeRowHeight}`);
   if (out.playerContainer !== 'player') failures.push('播放器区域没建立容器查询上下文');
   if (a.player && a.player.w <= 420 && out.playerBodyDir !== 'column') failures.push(`窄列里播放器没切到竖排：${out.playerBodyDir}`);
   if (!out.searchInBar) failures.push('搜索栏不在顶栏里');
   if (out.chipsPerRow !== 2) failures.push(`窄列里主机信息不是两列：${out.chipsPerRow}`);
+
+  // ---------- 面板 tab 与逐面板切换 ----------
+  const pages = out.layout.pages || [];
+  const sharedAts = (out.layout.shared || []).map((slot) => slot.at);
+  if (!pages.length) failures.push('layout.json 里没有 pages（面板）');
+  if (!sharedAts.length) failures.push('layout.json 里没有 shared（常驻位置）');
+  if (out.tabs.length !== pages.length) failures.push(`顶栏只有 ${out.tabs.length} 个面板 tab，layout.json 里有 ${pages.length} 个面板`);
+  for (const [index, item] of pages.entries()) {
+    const tab = out.tabs[index];
+    if (!tab) break;
+    if (tab.page !== item.id) failures.push(`第 ${index + 1} 个 tab 指向 "${tab.page}"，配置里是 "${item.id}"`);
+    if (tab.text !== item.name) failures.push(`第 ${index + 1} 个 tab 写着 "${tab.text}"，配置里叫 "${item.name}"`);
+  }
+  const litTab = out.tabs.find((tab) => tab.active);
+  if (!litTab) failures.push('没有一个面板 tab 是高亮的');
+  else if (litTab.page !== out.activePage) failures.push(`高亮的 tab 是 "${litTab.page}"，当前面板却是 "${out.activePage}"`);
+
+  // 走真实点击（不是直接调 setPage）：tab 接线、外壳重建、常驻格不动，都在这一趟里验
+  const original = out.activePage;
+  for (const item of pages) {
+    if (item.id === original) continue;
+    try {
+      await evaluate(page, `document.querySelector('.topbar .page-tab[data-page="${item.id}"]').click();'ok'`);
+      const shot = JSON.parse(await evaluateReady(page, EXPRESSION));
+      if (shot.activePage !== item.id) failures.push(`点 tab 切到 "${item.id}" 没生效，还停在 "${shot.activePage}"`);
+      for (const at of sharedAts) {
+        const before = out.areas[at];
+        const after = shot.areas[at];
+        if (!after) failures.push(`面板 "${item.id}" 里常驻位置 "${at}" 消失了`);
+        else if (before && after.module !== before.module) failures.push(`常驻位置 "${at}" 在面板 "${item.id}" 里换成了 "${after.module}"（切页不该动它）`);
+      }
+      overflowOf(shot.areas, item.id);
+      slotsMatchDom(shot, `面板 "${item.id}"`);
+      const lit = shot.tabs.find((tab) => tab.active);
+      if (!lit || lit.page !== item.id) failures.push(`切到面板 "${item.id}" 后高亮停在 "${lit?.page}"`);
+      console.log(`面板 ${item.id.padEnd(6)} ${Object.entries(shot.areas).map(([at, box]) => `${at}:${box?.module || '空'}`).join(' ')}`);
+      if (SHOTS) {
+        const file = path.join(APP_ROOT, 'samples', `layout-page-${item.id}.png`);
+        await capture(page, file);
+        console.log(`  截图 ${file}`);
+      }
+    } catch (error) {
+      failures.push(`切到面板 "${item.id}" 失败：${error.message}`);
+    }
+  }
+  // 验完切回去：当前面板会写进 state.json，别把界面留在别的面板上
+  try {
+    await evaluate(page, `TB.app.setPage(${JSON.stringify(original)});'ok'`);
+  } catch (error) {
+    failures.push(`切回原面板 "${original}" 失败：${error.message}`);
+  }
 
   if (SHOTS) {
     try {
@@ -167,7 +237,7 @@ async function main() {
     }
   }
 
-  // 「组件与位置」面板要能把新位置（slot1/slot2）挑给别的组件：验一下行数和下拉项数
+  // 「组件与位置」面板：要能选面板，位置数 = 常驻 + 本面板
   try {
     const editor = JSON.parse(
       await evaluate(
@@ -176,14 +246,17 @@ async function main() {
           TB.layoutEditor.open();
           const host = document.getElementById('layout-editor');
           const rows = [...host.querySelectorAll('.slot-row')];
-          const out = { rows: rows.length, slots: rows.filter((r) => r.querySelector('.slot-select')).length, areas: rows.map((r) => r.querySelector('.slot-area')?.textContent).filter(Boolean).join(','), options: rows[0]?.querySelectorAll('option').length || 0 };
+          const out = { rows: rows.length, slots: rows.filter((r) => r.querySelector('.slot-select')).length, areas: rows.map((r) => r.querySelector('.slot-area')?.textContent).filter(Boolean).join(','), options: rows[0]?.querySelectorAll('option').length || 0, tabs: [...host.querySelectorAll('.page-tab')].map((b) => b.textContent.trim()).join(',') };
           TB.layoutEditor.close();
           return JSON.stringify(out);
         })()`
       )
     );
-    console.log(`组件与位置面板：${editor.slots} 个可选位置（${editor.areas}）/ 每个下拉 ${editor.options} 项`);
-    if (editor.slots !== out.layout.slots.length) failures.push(`面板里的位置数 ${editor.slots} 和 layout.json 的 ${out.layout.slots.length} 对不上`);
+    console.log(`组件与位置面板：${editor.slots} 个可选位置（${editor.areas}）/ 面板页签「${editor.tabs}」/ 每个下拉 ${editor.options} 项`);
+    const current = pages.find((item) => item.id === original) || pages[0];
+    const expected = sharedAts.length + (current?.slots.length || 0);
+    if (editor.slots !== expected) failures.push(`面板里的位置数 ${editor.slots} 和「常驻 ${sharedAts.length} + 本面板 ${current?.slots.length}」对不上`);
+    if (editor.tabs.split(',').length !== pages.length) failures.push(`「组件与位置」里只有 ${editor.tabs.split(',').filter(Boolean).length} 个面板页签，配置里有 ${pages.length} 个`);
     if (editor.options < 8) failures.push(`下拉里只有 ${editor.options} 个组件，占位组件没注册上？`);
   } catch (error) {
     failures.push(`打不开「组件与位置」面板：${error.message}`);
@@ -193,7 +266,7 @@ async function main() {
     for (const line of failures) console.log(`✗ ${line}`);
     process.exitCode = 1;
   } else {
-    console.log(`✓ 布局全绿：音乐在时钟下方（${a.player.w}x${a.player.h}）、原位置拆两格、指标固定 ${out.gaugeRowHeight}px、搜索栏常驻`);
+    console.log(`✓ 布局全绿：${pages.length} 个面板逐个切过（音乐在时钟下方 ${a.player.w}x${a.player.h}、指标固定 ${out.gaugeRowHeight}px、搜索栏常驻、常驻位置切页不动）`);
   }
 }
 

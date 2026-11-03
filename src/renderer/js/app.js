@@ -1,7 +1,7 @@
 TB.api = window.deskToolbar;
 
 TB.app = {
-  state: { config: null, tasks: [], notes: '', player: null, grid: null, clipboard: [], ai: { messages: [], streaming: null, stream: null, error: null, key: null }, fast: null, full: null, placement: null, displays: [] },
+  state: { config: null, tasks: [], notes: '', player: null, grid: null, page: null, clipboard: [], ai: { messages: [], streaming: null, stream: null, error: null, key: null }, fast: null, full: null, placement: null, displays: [] },
   info: { electron: '', appVersion: '' },
   defaultLayout: null,
   config: null,
@@ -24,6 +24,7 @@ TB.app = {
     this.info = { electron: info.electron, appVersion: info.appVersion };
     this.defaultLayout = info.defaultLayout;
     this.state.grid = info.layout;
+    this.state.page = info.layout.pages.some((page) => page.id === info.page) ? info.page : info.layout.pages[0]?.id;
     this.applyPayload(info);
 
     TB.api.metrics.onFast((fast) => {
@@ -91,8 +92,7 @@ TB.app = {
     const shell = document.getElementById('shell');
     if (!layout || !shell) return;
 
-    const placed = layout.slots.filter((slot) => {
-      if (!slot.enabled || !slot.module) return false;
+    const placed = this.effectiveSlots().filter((slot) => {
       if (!TB.components.has(slot.module)) {
         console.warn(`[layout] 位置 "${slot.at}" 引用的组件 "${slot.module}" 不存在，已留空`);
         return false;
@@ -134,7 +134,36 @@ TB.app = {
   },
 
   applyLayoutResult(result) {
+    const pages = result.layout.pages || [];
+    if (!pages.some((page) => page.id === this.state.page)) this.state.page = pages[0]?.id || null;
     this.applyPayload({ ...this.state, layout: result.layout });
+  },
+
+  // ---------- 面板（page）----------
+  // grid 形状全局一份，shared 是跨面板常驻的那几格，pages 只决定可换位置放哪个组件。
+  pages() {
+    return this.state.grid?.pages || [];
+  },
+
+  activePage() {
+    const pages = this.pages();
+    return pages.find((page) => page.id === this.state.page) || pages[0] || null;
+  },
+
+  effectiveSlots() {
+    const layout = this.state.grid;
+    if (!layout) return [];
+    const page = this.activePage();
+    return [...(layout.shared || []), ...(page?.slots || [])].filter((slot) => slot.enabled && slot.module);
+  },
+
+  setPage(id) {
+    const page = this.pages().find((item) => item.id === id);
+    if (!page || this.state.page === id) return;
+    this.state.page = id;
+    // 存失败（比如面板刚被删掉）不打断切换，只是下次启动回到原来的页
+    TB.api.layout.setPage(id).catch(() => {});
+    this.buildShell();
   },
 
   refresh(module) {

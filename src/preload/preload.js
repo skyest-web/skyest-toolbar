@@ -18,7 +18,8 @@ contextBridge.exposeInMainWorld('deskToolbar', {
 
   layout: {
     save: (layout) => invoke('layout:save', layout),
-    openFile: () => invoke('layout:openFile')
+    openFile: () => invoke('layout:openFile'),
+    setPage: (pageId) => invoke('page:set', pageId)
   },
 
   components: {

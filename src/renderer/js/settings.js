@@ -305,9 +305,9 @@ TB.settings = {
     );
     searchCard.dataset.card = 'search';
 
-    // ----- 组件与位置（layout.json 的 slots） -----
-    const visibleCount = layout.slots.filter((slot) => slot.enabled && slot.module).length;
-    const gridSummary = `${layout.grid.columns.length} 列 × ${layout.grid.rows.length} 行`;
+    // ----- 组件与位置（layout.json 的常驻位置 + 当前面板） -----
+    const visibleCount = TB.app.effectiveSlots().length;
+    const gridSummary = `${layout.grid.columns.length} 列 × ${layout.grid.rows.length} 行 · ${layout.pages.length} 个面板，当前「${TB.app.activePage()?.name || '—'}」`;
 
     const screenCard = this.card(
       '屏幕目标',
