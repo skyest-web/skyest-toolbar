@@ -23,10 +23,10 @@
     "layout:appprobe": "node ./tools/layout-appprobe.js"
   },
   "dependencies": {
-    "node-edge-tts": "^1.2.12",
-    "sherpa-onnx-node": "^2.0.1",
     "@deepseek-ai/dsh": "^0.2.1-rc.2",
-    "koffi": "^3.1.1"
+    "koffi": "^3.3.6",
+    "node-edge-tts": "^1.2.12",
+    "sherpa-onnx-node": "^2.0.1"
   },
   "devDependencies": {
     "@electron/packager": "^20.3.0",
