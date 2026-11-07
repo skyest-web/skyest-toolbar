@@ -558,6 +558,913 @@ body:not(.ready) .shell {
   background: #000;
 }
 
+/* ---------- trainers ---------- */
+.trainers {
+  display: flex;
+  flex-direction: column;
+}
+
+.trainers #trainers {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  gap: 5px;
+  padding: 6px 8px;
+}
+
+.tr-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.tr-count {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tr-head .link-btn {
+  margin-left: auto;
+}
+
+.tr-filter {
+  flex: 0 0 auto;
+  height: 26px;
+  font-size: 0.88rem;
+}
+
+/* 两列以上靠 auto-fill：宽格（游戏面板中格跨两列）排两列，窄格自动退回一列。
+   min-height:0 + overflow-y 是硬要求——外层 .area 是 overflow:hidden，不写就被静默裁掉 */
+.tr-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  align-content: start;
+  gap: 4px;
+}
+
+/* button 上直接写 overflow:hidden + nowrap 会让它在 grid 的 auto 行里把内容盒塌成 0
+   （实测行高只有 10px = 上下 padding 8 + 边框 2，16px 高的字被裁到只剩 2px）。
+   所以按 .clip-item 那套来：行本身是 flex，文字交给一个 span 去截断，行高写死。 */
+.tr-item {
+  display: flex;
+  align-items: center;
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  text-align: left;
+  padding: 4px 8px;
+  min-height: 26px;
+  cursor: pointer;
+}
+
+.tr-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr-item:hover {
+  border-color: var(--accent);
+}
+
+.tr-list .muted {
+  grid-column: 1 / -1;
+  font-size: 0.78rem;
+}
+
+/* ---------- steam ---------- */
+/* 结构和 trainers 一样：行是 flex，文字截断交给 .st-name 自己。
+   这里不写 overflow:hidden 到 button 上——那会让 grid auto 行把内容盒塌成 0（见 trainers 那段注释） */
+.steam {
+  display: flex;
+  flex-direction: column;
+}
+
+.steam #steam {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  gap: 5px;
+  padding: 6px 8px;
+}
+
+.st-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.st-count {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.st-head .link-btn {
+  margin-left: auto;
+}
+
+.st-filter {
+  flex: 0 0 auto;
+  height: 26px;
+  font-size: 0.88rem;
+}
+
+.st-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  align-content: start;
+  gap: 4px;
+}
+
+.st-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  text-align: left;
+  padding: 4px 8px;
+  min-height: 26px;
+  cursor: pointer;
+}
+
+.st-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-ago {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.st-item:hover {
+  border-color: var(--accent);
+}
+
+.st-item:hover .st-ago {
+  color: var(--text);
+}
+
+.st-list .muted {
+  grid-column: 1 / -1;
+  font-size: 0.78rem;
+}
+
+/* ---------- games（游戏面板中间那一大格）---------- */
+/* 两列并排，每格里是「图标 +（名字 / 它的修改器）」；跟着 .st-list 同一个教训：
+   截断交给 .gz-name 自己，.gz-item 不写 overflow:hidden，免得内容盒在自动行高里塌成 0。 */
+.games {
+  display: flex;
+  flex-direction: column;
+}
+
+.games #games {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  gap: 5px;
+  padding: 6px 8px;
+}
+
+.gz-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.gz-count {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.gz-head .link-btn {
+  margin-left: auto;
+}
+
+.gz-filter {
+  flex: 0 0 auto;
+  height: 26px;
+  font-size: 0.88rem;
+}
+
+.gz-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* 图标是 60 张异步加载的本地图，Chromium 的滚动锚定会把「最后变化的那个」当成锚点，
+     刚进这一格时整列表被弹到底部（实测 scrollTop 一下跳到 2666）。这一格不需要它。 */
+  overflow-anchor: none;
+  display: grid;
+  /* 两列、按行排（左、右、左、右），整块还是纵向滚：这一格 1152px 宽，一行一款太浪费。
+     minmax(0,1fr) 而不是 auto-fill：格子宽度是骨架里写死的，别让列数跟着窗口抖。 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 4px 8px;
+}
+
+/* 过滤不出来 / 库为空 / 主进程报错时那句提示横跨两列 */
+.gz-list > .muted {
+  grid-column: 1 / -1;
+}
+
+.gz-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  padding: 4px 8px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.gz-icon {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--panel);
+}
+
+/* 图没缓存上（新装游戏还没生成 librarycache）时留个同尺寸的透明位，行高不跟着跳 */
+.gz-icon.broken {
+  visibility: hidden;
+}
+
+.gz-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.gz-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gz-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.gz-ago {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.gz-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.gz-chips:empty {
+  display: none;
+}
+
+.gz-chip {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: inherit;
+  /* 0.88rem = 13.2px：比游戏名小一档，但这屏 dpr=1，再小就低于 13px 可读下限（探针卡这条） */
+  font-size: 0.88rem;
+  line-height: 1.5;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.gz-chip:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.gz-item:hover {
+  border-color: var(--accent);
+}
+
+.gz-item:hover .gz-ago {
+  color: var(--text);
+}
+
+/* ---------- projects（工作面板左边那一整块 projzone：repos.roots 那几个根底下的顶层项目）---------- */
+/* 330px 宽、430px 高（原 clock + player 两格合成一块）：一行只有一个项目，名字吃掉剩余宽度并自己省略，
+   IDE 标签和「多久之前」固定在右边。左键是选中，所以选中项要有自己的样子，不能只靠 hover 那点描边（见 .pj-item.sel）。
+   跟着 .gz-item 同一个教训：截断交给 .pj-name 自己，.pj-item 不写 overflow:hidden，
+   免得内容盒在 flex 行里塌成 0（DOM 全在、探针全绿，人却看不清）。 */
+.projects-area {
+  display: flex;
+  flex-direction: column;
+}
+
+.projects-area #projects {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  gap: 5px;
+  padding: 6px 8px;
+}
+
+.pj-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.pj-count {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pj-head .link-btn {
+  margin-left: auto;
+}
+
+.pj-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* 六个项目里可能有一两个刚被 IDE 写过缩略图缓存；这一格不需要滚动锚定那点聪明劲 */
+  overflow-anchor: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pj-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  /* 0.88rem = 13.2px：这屏 dpr=1，整行的基准字号低于 13px 就看不清了 */
+  font-size: 0.88rem;
+  padding: 2px 8px;
+  min-height: 26px;
+  cursor: pointer;
+}
+
+.pj-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+/* 这一行就是「点下去会用哪个 IDE 开」，所以字号和名字同档，不当次要信息压小 */
+.pj-ide {
+  flex: 0 0 auto;
+  max-width: 108px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.pj-ide.missing {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.pj-ago {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pj-item:hover {
+  border-color: var(--accent);
+}
+
+.pj-item:hover .pj-ago {
+  color: var(--text);
+}
+
+/* 选中项 = 中间那格 git 正在说的那个项目。悬停描边只在鼠标停着时才有，
+   光靠它分不出「哪一行是当前看的」，所以底色抬一档、名字跟着描边同色。 */
+.pj-item.sel {
+  background: var(--panel);
+  border-color: var(--accent);
+}
+
+.pj-item.sel .pj-name {
+  color: var(--accent);
+}
+
+.pj-item.sel .pj-ago {
+  color: var(--text);
+}
+
+/* 多个根里有一路读不到：单独占一行说清是哪个根，不掀整张列表（字号和 .pj-ago 同档，比正文小但没到看不清） */
+.pj-warn {
+  flex: 0 0 auto;
+  font-size: 0.74rem;
+  color: var(--warn);
+  padding: 1px 8px;
+  word-break: break-all;
+}
+
+/* ---------- git（工作面板中间那一整块 gitzone：项目格的第二个视图，约 595×430）---------- */
+/* 一格只看一个仓库，看哪个由左边选中决定，所以「列表 + 点开哪一行」那一层没了：
+   整块要么是一句提示（没选中）、要么是详情（仓库）、要么是信息卡 + 根目录清单（非仓库）。
+   截断还是那条老规矩——交给 .gt-name / .gt-file 自己，父级不写 overflow:hidden，
+   免得内容盒在横向 flex 行里塌成 0（DOM 全在、探针全绿，人却看不清）。 */
+.git-area {
+  display: flex;
+  flex-direction: column;
+}
+
+.git-area #git {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.gt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.gt-count {
+  font-size: 0.87rem;
+  color: var(--muted);
+  /* 摘要里全是数字（2 冲突 · 3 改动 · 4 未跟踪），不等宽会让整句话左右晃 */
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gt-head .link-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.gt-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-anchor: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 列表里的每一条按内容排，装不下就滚——不许 flex-shrink 把它们压扁。
+   这条老教训留着：少了它，详情整段会被压成十几 px 的空壳，清单 0 高、动作行画到框外面，
+   探针却全绿（它只比格子矩形），人看到的是边框里空无一物。 */
+.gt-list > * {
+  flex: 0 0 auto;
+}
+
+/* 详情是三条状态里唯一「内容比格子高」的那一条，所以它既可以被压（shrink），也要把剩下的竖向空间吃满（grow）。
+   只写 0 1 auto 时它按内容算高：改动少的时候整块缩在上半截，下面 250px 空着，文件清单只剩两行（截图看到的）。
+   压下来的高度由 .gt-repo 传给文件清单，动作行和说明框永远在格子内——和老规矩同一个思路，
+   只是伸缩的那一段从「展开行里的详情」挪到了「整块详情」。 */
+.gt-list > .gt-repo {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* 默认态：没选中任何项目时整格只有这一句。上下 margin:auto 让它在这一块里居中，
+   看着像「在等人」而不是「读完了但没东西」。 */
+.gt-prompt {
+  margin: auto 0;
+  padding: 16px 10px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+
+.gt-repo {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  padding: 6px 8px;
+}
+
+/* 仓库那一行：项目名 + 状态位 + 一句次要信息。名字可缩，状态位不缩，剩下的高度给右边那句 */
+.gt-who {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.gt-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+/* 一块位置只说最要紧那一条（游离 / 冲突 / 尚无提交 / ↑↓ ~+ 干净），其余在悬浮说明里 */
+.gt-chip {
+  flex: 0 0 auto;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.87rem;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.gt-chip.dirty {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.gt-chip.clean {
+  color: var(--ok);
+}
+
+.gt-chip.bad {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+/* 仓库那一行右边那句：上游 / HEAD / 已暂存 / 没暂存。次要信息，靠右且自己省略 */
+.gt-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  color: var(--muted);
+  font-size: 0.87rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 「本机没找到 git」和「这个仓库读不到」两句话：比正文矮半档不行，这正是要看清的 */
+.gt-note {
+  flex: 0 0 auto;
+  font-size: 0.87rem;
+  color: var(--warn);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.gt-note.bad {
+  color: var(--error);
+}
+
+/* 文件清单是这一格里唯一可伸缩的那一段：一个仓库能有三四百条改动，
+   清单可以滚，但动作行和提交说明框永远不许让位。
+   按钮是这一列里的 stretch 项（不是横向 flex 里那个会塌的），所以这里 min-width:0 + 省略号是安全的。 */
+.gt-files {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 1 40px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-anchor: none;
+}
+
+.gt-file {
+  align-self: stretch;
+  /* 0 0 auto：这一列里的每一条不许被压。清单是 flex 纵向的，而 .gt-file 自己 overflow:hidden——
+     自动最小尺寸在这种情况下是 0，80 条改动会一起缩成 2px 高，框子还在、字全没了（放大截图看到的）。
+     装不下就让 .gt-files 自己滚，别压行高。 */
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.87rem;
+  padding: 1px 2px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.gt-file:hover {
+  background: var(--panel-2);
+  color: var(--accent);
+}
+
+.gt-file.conflicted {
+  color: var(--error);
+}
+
+.gt-file.untracked {
+  color: var(--muted);
+}
+
+.gt-file.staged {
+  color: var(--ok);
+}
+
+.gt-more {
+  font-size: 0.87rem;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.gt-ops {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+.gt-op {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.87rem;
+  border-radius: 5px;
+  padding: 1px 8px;
+  cursor: pointer;
+}
+
+.gt-op:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* push 是别人看得见的动作，按钮颜色先分开：和确认条上的那句话一起提醒 */
+.gt-op.push {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.gt-msgbox {
+  /* 1 1 100%：动作行是 flex-wrap 的横向列，说明框要自己占满一行。
+     原来只写 flex: 0 0 auto，textarea 的 width:100% 是对着内容宽度算的，整框缩到 145px，
+     placeholder 被裁掉一半（探针量出来的：156px 的字放进 129px 的框） */
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.gt-msg {
+  width: 100%;
+  /* 一行高：说明框和文件清单抢的就是这 176px，textarea 从 46px 收到 24px 换来清单两行改动文件名。
+     写长的说明也看得全——确认条上会把这句话原样念一遍 */
+  min-height: 24px;
+  resize: none;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.87rem;
+  padding: 3px 6px;
+}
+
+.gt-msg:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* 确认条：5 秒内有效，写完「这一步会动到什么」再决定。它挂出来时整格只渲染它，不做浮层——
+   浮层要管 z-index 和越界，而这一条本来就该长在这一格上。 */
+.gt-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  /* 确认条挂出来时整格只有它（见 components/git.js 的 renderList），上下留白交给 margin:auto 均分：
+     这一格合成以后有 402px 高，贴顶挂会留一大截空，看着像读到了但没东西——和默认态那句提示同一个处理。 */
+  margin: auto 0;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel-2);
+  padding: 4px 6px;
+}
+
+.gt-ask.push {
+  border-color: var(--warn);
+}
+
+.gt-ask-who {
+  font-size: 0.87rem;
+  color: var(--text);
+}
+
+.gt-ask-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* 这句话说的是「按下确认会动到什么」，是整格里最该看清的字，不跟着别处缩一档 */
+.gt-ask-line {
+  font-size: 0.87rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gt-ask-btns {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.gt-yes,
+.gt-no {
+  font: inherit;
+  /* 这两个按钮是整格唯一「按下去真会动远端」的地方，字号按可读下限来，不跟着小按钮那档缩 */
+  font-size: 0.87rem;
+  border-radius: 5px;
+  padding: 1px 10px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.gt-yes {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.gt-ask.push .gt-yes {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+/* ---------- 状态二：选中的项目不是 git 仓库 ---------- */
+/* 这张卡说的是「这个项目在本机是什么样」，一条条对齐着读比一段话快；
+   左边那列标签固定宽度，右边那句自己省略，完整值在悬浮说明里（路径长到看不全是常态）。 */
+.gt-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  padding: 8px 10px;
+  font-size: 0.87rem;
+}
+
+.gt-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gt-card-why {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.gt-card-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.gt-card-line {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.gt-card-label {
+  flex: 0 0 84px;
+  color: var(--muted);
+}
+
+.gt-card-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 仓库根目录那一栏配了哪几处：和上面的项目信息分开一段，虚线是「这是配置，不是这个仓库的情况」 */
+.gt-roots {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--line);
+}
+
+.gt-roots-title {
+  color: var(--muted);
+}
+
+.gt-root {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 8px;
+  border-left: 2px solid var(--line);
+}
+
+.gt-roots-empty {
+  color: var(--warn);
+}
+
 /* ---------- player ---------- */
 .player-area {
   display: flex;
@@ -1833,6 +2740,16 @@ input[type='checkbox'] {
   resize: vertical;
 }
 
+/* 仓库根目录：一行一个路径，路径比单行输入长，给它横向撑满 + 纵向可拉 */
+.repos-roots {
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  resize: vertical;
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
 
 /* ---------- search：顶栏常驻搜索栏 + 结果下拉 ---------- */
 .search-bar {
@@ -2029,4 +2946,661 @@ input[type='checkbox'] {
   font-size: 0.75rem;
   line-height: 1.45;
   opacity: 0.8;
+}
+
+/* ---------- mail（生活面板左侧那一整块：原 clock + player 合并）---------- */
+/* 这一格只有 330px 宽，一行塞不下「发件人 + 主题 + 时间」，所以每封两行：
+   第一行发件人靠左、时间靠右，第二行主题。截断各自负责，.ml-item 不写 overflow:hidden
+   ——同一个教训见上面 .gz-list 那段注释（行上直接裁会把内容盒压成 0 高）。 */
+.mail {
+  display: flex;
+  flex-direction: column;
+}
+
+.mail #mail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.ml-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.ml-count {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  /* 两个小按钮贴右，计数牌自己吃掉中间的空 */
+  margin-right: auto;
+}
+
+.ml-head .link-btn.on {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.ml-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* 每次拉取都是整块重建 DOM，留着滚动锚定的话列表会被弹到底部 */
+  overflow-anchor: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ml-note {
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--text);
+  padding: 4px 2px;
+  /* 错误提示要能换行读完，别跟着列表行去省略号 */
+  white-space: normal;
+}
+
+.ml-note.muted {
+  color: var(--muted);
+}
+
+.ml-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 34px;
+  min-width: 0;
+  padding: 3px 4px;
+  border-radius: 6px;
+  cursor: default;
+}
+
+.ml-item:hover {
+  background: var(--panel-2);
+}
+
+.ml-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 50%;
+  /* 已读留个空位：两行的左右起点才不会跟着未读与否跳动 */
+  background: transparent;
+}
+
+.ml-item.unread .ml-dot {
+  background: var(--accent);
+}
+
+.ml-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ml-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ml-from {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.ml-item.unread .ml-from {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ml-when {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ml-subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* 主题是这一格里真正要读的那一行，字号跟着游戏列表那档走（13px 起） */
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.ml-foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 5px;
+}
+
+.ml-who {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* ---------- video（生活面板 slot2：本地视频；slot1 是原来的音乐播放器）---------- */
+/* 中间那一行的两格现在一格音乐一格视频，宽度都是 minmax(0,1fr)。
+   画面按 contain 走 letterbox：这一格矮（第 3 行 minmax(150px,1fr)），硬铺会把控制条挤出格子。 */
+.video-area {
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+  container-name: video;
+}
+
+.video-area #video {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.vd-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.vd-count {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.vd-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.vd-head .link-btn.on {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.vd-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 8px;
+}
+
+.vd-stage {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #05080c;
+  overflow: hidden;
+}
+
+.vd-player {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: transparent;
+}
+
+.vd-side {
+  flex: 0 0 34%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
+.vd-line {
+  flex: 0 0 auto;
+  font-size: 0.74rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.vd-line.err {
+  color: var(--error);
+}
+
+.vd-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* 点一行会整块重建清单，留着滚动锚定会被弹到底部（和 .ml-list 同一条教训） */
+  overflow-anchor: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: 2px;
+}
+
+.vd-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 4px;
+  color: var(--text);
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.vd-item:hover {
+  background: var(--panel-2);
+}
+
+.vd-item.active {
+  border-left-color: var(--accent);
+  background: var(--panel-2);
+  color: var(--accent);
+}
+
+.vd-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vd-item-tag {
+  flex: 0 0 auto;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.vd-none {
+  font-size: 0.76rem;
+  padding: 4px 2px;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+/* ---------- 视频那一格的两档来源（本地 / B站） ----------
+   切到 B 站就把画面格整个收起来，清单吃掉整格宽：这一档不放流，没有要留位的东西。
+   is-bili 挂在 #video 这一层（组件的 root），不在 section.video-area 上。 */
+#video.is-bili .vd-stage {
+  display: none;
+}
+
+#video.is-bili .vd-side {
+  flex: 1 1 auto;
+  border-left: none;
+  padding-left: 0;
+}
+
+.seg-btn {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.seg-btn + .seg-btn {
+  margin-left: -4px;
+}
+
+.seg-btn.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #061019;
+}
+
+.bl-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.bl-tabs[hidden] {
+  display: none;
+}
+
+.bl-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  padding: 2px 4px;
+  white-space: nowrap;
+}
+
+.bl-tab:hover {
+  color: var(--text);
+}
+
+.bl-tab.on {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 退出夹子那一个固定在页签行最右：进得深了列表是滚动的，退路不该跟着滚走 */
+.bl-tab.bl-back {
+  margin-left: auto;
+}
+
+.bl-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 4px;
+  color: var(--text);
+  padding: 3px 6px 3px 4px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.bl-item:hover {
+  background: var(--panel-2);
+  border-left-color: var(--accent);
+}
+
+/* 没有封面也留这一块深色：行高一致，一列扫下来才是一条直线 */
+.bl-cover {
+  flex: 0 0 68px;
+  width: 68px;
+  height: 42px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #0b1118;
+}
+
+.bl-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bl-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.bl-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+}
+
+.bl-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ↗ = 交给浏览器打开，▸ = 点进去还有一层列表——两种「点它会发生什么」得看着就不一样 */
+.bl-mark {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+/* 窄一点就把清单挪到画面下方，右边那一条 34% 挤不出能读完的文件名 */
+@container video (max-width: 420px) {
+  .vd-body {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .vd-stage {
+    flex: 1 1 60%;
+    min-height: 96px;
+  }
+  .vd-side {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-left: 0;
+    border-left: none;
+    border-top: 1px solid var(--line);
+    padding-top: 4px;
+  }
+}
+
+/* ---------- photos（生活面板 gauges 那一格：本地照片墙）---------- */
+/* 第 2 行的 gauges 是一条 1152×176 的宽条：一排缩略图横向滚，点一张在整窗上开大图。
+   缩略图定高不定宽，按原图比例摊开——照片墙最怕把竖图裁成方块，比例本身就是内容。 */
+.photos-area {
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+  container-name: photos;
+}
+
+.photos-area #photos {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.ph-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.ph-count {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ph-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.ph-head .link-btn.on {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.ph-strip {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* 清单整块重建，留着滚动锚定会把 scrollLeft 弹走（和 .ml-list / .vd-list 同一条教训） */
+  overflow-anchor: none;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.ph-item {
+  flex: 0 0 auto;
+  display: block;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.ph-thumb {
+  display: block;
+  height: 124px;
+  width: auto;
+  min-width: 96px;
+  max-width: 176px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--panel-2);
+}
+
+.ph-item:hover .ph-thumb {
+  filter: brightness(1.15);
+}
+
+/* 最近载入过的那张描边，正在放大看的那张再多一圈光；都用 outline，
+   改 border 会把每张的宽度撑掉几像素，横向排布跟着抖。 */
+.ph-item.active .ph-thumb {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ph-item.open .ph-thumb {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px rgba(90, 170, 255, 0.28);
+}
+
+.ph-none {
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* 窗口窄的时候 124 高的图条会顶破格子，缩成一排小图 */
+@container photos (max-width: 760px) {
+  .ph-thumb {
+    height: 84px;
+    min-width: 64px;
+    max-width: 120px;
+  }
+}
+
+/* 浮层：盖满整窗的暗底 + 居中 contain 的大图 + 底部一条说明和翻页键。
+   挂 body + position:fixed 是因为 .area 有 overflow:hidden，越出格子的部分会被静默吃掉。
+   z-index 45：在面板之上、设置弹窗(50)之下——开着浮层点齿轮仍能打开设置。 */
+.ph-view {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: rgba(4, 7, 10, 0.88);
+}
+
+.ph-view[hidden] {
+  display: none;
+}
+
+.ph-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ph-full {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  /* Chromium 默认值，写出来是为了记住 iPhone 直出的照片不用自己解析 EXIF 也会转正 */
+  image-orientation: from-image;
+}
+
+.ph-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ph-cap-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.ph-nav {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ph-nav:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }

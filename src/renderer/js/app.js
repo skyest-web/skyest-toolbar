@@ -1,7 +1,7 @@
 TB.api = window.deskToolbar;
 
 TB.app = {
-  state: { config: null, tasks: [], notes: '', player: null, grid: null, page: null, clipboard: [], ai: { messages: [], streaming: null, stream: null, error: null, key: null }, fast: null, full: null, placement: null, displays: [] },
+  state: { config: null, tasks: [], notes: '', player: null, video: null, grid: null, page: null, project: null, clipboard: [], ai: { messages: [], streaming: null, stream: null, error: null, key: null }, fast: null, full: null, placement: null, displays: [] },
   info: { electron: '', appVersion: '' },
   defaultLayout: null,
   config: null,
@@ -69,6 +69,14 @@ TB.app = {
       this.state.displays = displays;
       this.toast('屏幕布局变化，已重新贴合工具栏屏', 'warn');
     });
+    // 桌面反过来驱动面板：他用 Win+Ctrl+←/→ 切到某个绑了面板的桌面，主进程挑好面板发过来。
+    // 这里只换界面，绝不再走 layout.setPage——那条 IPC 会把桌面又切回去，两边打乒乓。
+    TB.api.layout.onSync((payload) => {
+      this.applyPageFromDesktop(payload?.page, payload?.reason);
+    });
+    // 邮箱的两条推送都由主进程那条看护轮询发出来：updated 只管让开着的那一格重画，
+    // new 才是「刚到了新邮件」——宠物动一下 + 一句固定文案，走本地/在线 TTS，不发 DeepSeek。
+    TB.api.mail.onNew((news) => this.notifyMail(news));
 
     document.body.classList.add('ready');
   },
@@ -79,6 +87,7 @@ TB.app = {
     if (payload.tasks) this.state.tasks = payload.tasks;
     if (payload.notes !== undefined) this.state.notes = payload.notes;
     if (payload.player !== undefined) this.state.player = payload.player;
+    if (payload.video !== undefined) this.state.video = payload.video;
     if (payload.clipboard) this.state.clipboard = payload.clipboard;
     if (payload.ai) this.state.ai = { ...this.state.ai, ...payload.ai };
     if (payload.placement) this.state.placement = payload.placement;
@@ -101,9 +110,10 @@ TB.app = {
     });
 
     const visible = new Set(placed.map((slot) => slot.at));
-    shell.style.gridTemplateColumns = layout.grid.columns.join(' ');
-    shell.style.gridTemplateRows = layout.grid.rows.join(' ');
-    shell.style.gridTemplateAreas = layout.grid.areas
+    const grid = this.activeGrid();
+    shell.style.gridTemplateColumns = grid.columns.join(' ');
+    shell.style.gridTemplateRows = grid.rows.join(' ');
+    shell.style.gridTemplateAreas = grid.areas
       .map((row) => `"${row.map((token) => (visible.has(token) ? token : '.')).join(' ')}"`)
       .join(' ');
 
@@ -140,7 +150,8 @@ TB.app = {
   },
 
   // ---------- 面板（page）----------
-  // grid 形状全局一份，shared 是跨面板常驻的那几格，pages 只决定可换位置放哪个组件。
+  // shared 是跨面板常驻的那几格，pages 决定可换位置放哪个组件；
+  // 面板还可以自带一份 grid（游戏面板把中间四格合成一个大格），没带就用全局的。
   pages() {
     return this.state.grid?.pages || [];
   },
@@ -148,6 +159,11 @@ TB.app = {
   activePage() {
     const pages = this.pages();
     return pages.find((page) => page.id === this.state.page) || pages[0] || null;
+  },
+
+  activeGrid() {
+    const layout = this.state.grid;
+    return this.activePage()?.grid || layout?.grid;
   },
 
   effectiveSlots() {
@@ -164,6 +180,31 @@ TB.app = {
     // 存失败（比如面板刚被删掉）不打断切换，只是下次启动回到原来的页
     TB.api.layout.setPage(id).catch(() => {});
     this.buildShell();
+  },
+
+  // 桌面驱动的换页：activePage 主进程已经写好了，这边只照着重建外壳。
+  applyPageFromDesktop(id, reason) {
+    const page = this.pages().find((item) => item.id === id);
+    if (!page || this.state.page === id) return;
+    this.state.page = id;
+    this.buildShell();
+    this.toast(`${reason || '虚拟桌面'} → 「${page.name}」`);
+  },
+
+  // ---------- 项目选中态（工作面板：左边项目格 → 中间 git 格）----------
+  // 存整条项目行而不是只有 id：git 格的「非仓库」那一态要说「该用哪个 IDE、按哪条规则判的、
+  // 多久没动过、从哪个根扫出来的」，这些话本来就写在项目格的行上，为它们再开一条 IPC 是重复。
+  // 放这里而不是组件里，理由和 tasks/notes 一样——切面板会整体重建 shell，组件字段跟着 DOM 没了；
+  // 切回来时左边还是那个选中项、右边还是那个仓库，不该退回「请先选项目」。
+  selectProject(item) {
+    const next = item && Number.isInteger(item.id) ? item : null;
+    const current = this.state.project;
+    // 同一个项目重选（重扫后 id 和路径都没变）不重渲染：否则点一下选中项会把展开态和滚动位置洗掉
+    if (Boolean(next) === Boolean(current) && (!next || (next.id === current.id && next.path === current.path))) return false;
+    this.state.project = next;
+    this.refresh('projects');
+    this.refresh('git');
+    return true;
   },
 
   refresh(module) {
@@ -228,6 +269,31 @@ TB.app = {
     this.nodes.toast.appendChild(node);
     setTimeout(() => node.classList.add('hide'), 2600);
     setTimeout(() => node.remove(), 3100);
+  },
+
+  // 新邮件提醒：动作 + 语音都只走本机这一套（宠物 react、固定模板的句子直接喂 TTS）。
+  // 一句话不值得发一次 DeepSeek 请求，所以这里一条 AI 的 IPC 都不碰。
+  notifyMail(news) {
+    const count = Number(news?.count) || 0;
+    if (!count) return;
+    TB.ai?.poke?.();
+    const speaker = this.speakerName(news.name);
+    const text = count === 1 && speaker
+      ? `邮箱来了新邮件，来自${speaker}`
+      : `邮箱来了 ${count} 封新邮件`;
+    this.toast(count === 1 ? `来了一封新邮件${news.name ? `：${news.name}` : ''}` : `来了 ${count} 封新邮件`, 'info');
+    // 正在念 AI 回复时不插嘴；语音开关在设置 → 邮箱里，关掉只安静，动作和提示条照旧
+    if (this.config?.mail?.notifyVoice !== false && !TB.voice?.speaking && TB.voice?.ttsReady()) {
+      TB.voice.speak(text);
+    }
+  },
+
+  // 念出来的是发件人显示名，不是地址：带 @ 的没法听（「no-reply@cmbchina.com」），
+  // 太长的一律不念——TTS 念到第七个字人就听不出重点了，宁可只报数量。
+  speakerName(name) {
+    const clean = String(name || '').replace(/[《》【】[\]()（）]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!clean || clean.includes('@') || clean.length > 12) return '';
+    return clean;
   }
 };
 

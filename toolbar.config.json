@@ -15,8 +15,9 @@
     }
   },
   "window": {
-    "alwaysOnTop": false,
-    "autoHideCursorMs": 5000
+    "alwaysOnTop": true,
+    "autoHideCursorMs": 5000,
+    "followVirtualDesktop": true
   },
   "metrics": {
     "pollMs": 1500,
@@ -113,6 +114,26 @@
     "volume": 0.7,
     "repeat": "all"
   },
+  "video": {
+    "folder": "",
+    "recursive": true
+  },
+  "photos": {
+    "folder": "D:\\OneDrive\\Pictures\\家庭\\结婚",
+    "recursive": true,
+    "limit": 400
+  },
+  "trainers": {
+    "folder": "H:\\GAMES\\FLiNGTrainers\\GCM Trainers"
+  },
+  "steam": {
+    "folder": "H:\\GAMES\\SteamLibrary\\steamapps"
+  },
+  "repos": {
+    "roots": [
+      "D:\\GitProject"
+    ]
+  },
   "ai": {
     "model": "deepseek-chat",
     "systemPrompt": "你是常驻在桌面工具栏里的助手，回答尽量简短。",
@@ -154,5 +175,19 @@
     "timeoutMs": 1500,
     "autoStart": true,
     "sort": "NAME_ASCENDING"
+  },
+  "mail": {
+    "enabled": true,
+    "account": "skyeststudio@163.com",
+    "host": "imap.163.com",
+    "port": 993,
+    "secure": true,
+    "mailbox": "INBOX",
+    "maxMessages": 20,
+    "pollMs": 120000,
+    "timeoutMs": 20000,
+    "webmail": "https://mail.163.com",
+    "notify": true,
+    "notifyVoice": true
   }
 }

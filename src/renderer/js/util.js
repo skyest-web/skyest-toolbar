@@ -62,6 +62,31 @@ TB.util = {
     return Math.min(max, Math.max(min, value));
   },
 
+  // 「多久之前」比时间戳有用：开列表基本是为了接着上次那个
+  ago(unixSeconds) {
+    if (!unixSeconds) return '没玩过';
+    const days = Math.floor((Date.now() - unixSeconds * 1000) / 86400000);
+    if (days < 1) return '今天';
+    if (days === 1) return '昨天';
+    if (days < 31) return `${days} 天前`;
+    if (days < 365) return `${Math.floor(days / 30)} 个月前`;
+    return `${Math.floor(days / 365)} 年前`;
+  },
+
+  // 文件修改时间：越近的写得越细，跨年只显示到年+月日就够了（相册缩略图的悬浮和大图说明用）
+  date(unixSeconds) {
+    if (!unixSeconds) return '未知时间';
+    const at = new Date(unixSeconds * 1000);
+    const now = new Date();
+    const pad = (value) => String(value).padStart(2, '0');
+    const sameDay = at.toDateString() === now.toDateString();
+    const yesterday = at.toDateString() === new Date(now.getTime() - 86400000).toDateString();
+    if (sameDay) return `今天 ${pad(at.getHours())}:${pad(at.getMinutes())}`;
+    if (yesterday) return `昨天 ${pad(at.getHours())}:${pad(at.getMinutes())}`;
+    if (at.getFullYear() === now.getFullYear()) return `${at.getMonth() + 1}月${at.getDate()}日`;
+    return `${at.getFullYear()}年${at.getMonth() + 1}月${at.getDate()}日`;
+  },
+
   sparkline(canvas, values, color) {
     if (!canvas) return;
     const ratio = window.devicePixelRatio || 1;

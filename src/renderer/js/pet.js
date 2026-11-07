@@ -156,6 +156,17 @@
 .pet-eyes .eye-open { transform-box: view-box; transform-origin: 60px 64px; }
 .pet-host[data-motion="full"] { animation: pet-idle 3.6s ease-in-out infinite; }
 .pet-host[data-motion="calm"] { animation: pet-idle 7.2s ease-in-out infinite; }
+/* 提醒用的那一下：整块弹起再落下。写在两条 motion 规则之后——同特异度，后写的赢，
+   跳的这 0.8 秒盖掉待机浮动，摘掉属性就又回到待机。 */
+@keyframes pet-hop {
+  0% { transform: translateY(0) scale(1, 1); }
+  22% { transform: translateY(-16px) scale(.94, 1.08); }
+  46% { transform: translateY(0) scale(1.06, .92); }
+  64% { transform: translateY(-7px) scale(1, 1); }
+  84% { transform: translateY(0) scale(1.03, .97); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+.pet-host[data-hop="on"] { animation: pet-hop .8s cubic-bezier(.3, .8, .4, 1) 1; }
 .pet[data-blink="on"] .eye-open { animation: pet-blink .18s ease-in-out; }
 .pet[data-talk="on"] .mouth-open { animation: pet-talk .26s ease-in-out infinite; }
 .pet[data-motion="off"] *, .pet-host[data-motion="off"] { animation: none !important; }
@@ -217,13 +228,21 @@
     return svg;
   }
 
-  // 点一下的反应：临时挤掉当前表情，一段时间后按原样恢复
+  // 点一下、或者来了新邮件的反应：临时挤掉当前表情，一段时间后按原样恢复
   function react(svg) {
     const mood = svg.getAttribute('data-mood') || 'calm';
     const motion = svg.getAttribute('data-motion') || 'full';
     apply(svg, { mood: 'happy', motion });
     clearTimeout(svg.reactTimer);
     svg.reactTimer = setTimeout(() => apply(svg, { mood, motion }), 1400);
+    // 光换表情在屏幕角落看不出来，所以再弹一下；motion 关掉的人不该被强行加戏
+    const host = svg.parentElement;
+    if (host && motion !== 'off') {
+      host.setAttribute('data-hop', 'on');
+      clearTimeout(svg.hopTimer);
+      // 到点自己摘：留着 data-hop，下一次 apply 之后就再也不会跳了
+      svg.hopTimer = setTimeout(() => host.removeAttribute('data-hop'), 820);
+    }
     return svg;
   }
 

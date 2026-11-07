@@ -52,7 +52,11 @@ Everything 是便携模式：**ini 和 db 都落在 exe 旁边**，不写注册�
 
 卸载：把上面第二条换成 `-uninstall-service`。
 
-**首跑那个坑**：便携版第一次启动生成的 ini 里 `index=0`——进程在、能连上、索引永远是空的，什么关键字都查不到东西。所以拉起前会调 `ensureHostConfig()`（在 `everything-sdk.js`，自检脚本共用）：只在 **ini 不存在时**补一份 `index=1 + auto_include_fixed_volumes=1 + ipc=1` 的 starter；你已经手工配过的 ini 一个字都不动。
+**首跑这两个坑**（都已经在代码里堵上了）：
+
+1. **别写 `index=1`。** ini 里 `index=` 这一族（`index` / `index_file_list` / `index_etp_server` / `index_link_type`）是"改用哪种替代索引"，不是"要不要建索引"。默认值 `0` 才是本地全盘索引；一旦变成 `1` 且 `index_file_list` 是空的，客户端会把**自己的当前目录**当文件列表去打开，于是每次冷启动弹一个「无法打开文件列表: ...\vendor\everything\app 不是有效的文件列表」的模态框。拉起前会调 `ensureHostConfig()`（在 `everything-sdk.js`，自检脚本共用）：ini 不存在时只补 `auto_include_fixed_volumes=1 + ipc=1`；已经存在且带着老 starter 写过的 `index=1` 就就地改回 `0`，其余一个字不动。
+2. **Everything 客户端是 GUI 程序。** 不带 `windowsHide` 拉起会在桌面闪一个满屏窗口。补上 `windowsHide: true`（`SW_HIDE`）之后看不见它，但 SDK 查询照常。
+   客户端进程本身不能省：IPC 走的是窗口消息，只剩服务（session 0）时查询会拿到 error code 2（`ipcDown`）。
 
 ## 4. 边界
 

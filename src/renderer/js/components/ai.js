@@ -139,6 +139,14 @@ TB.ai = {
     if (this.dshBtn) this.dshBtn.textContent = TB.dsh.label();
   },
 
+  // 给「来了新邮件」这类提醒用的一下：只让宠物做个动作，一次都不碰 AI 请求。
+  // persona=plain 或这一格被换掉时返回 false，调用方自己退化成提示条。
+  poke() {
+    if (!this.petHandle || !this.petHost?.isConnected) return false;
+    this.pet.react?.(this.petHandle);
+    return true;
+  },
+
   // 贴在宠物头顶居中（工具提示行露出来就让到它上面），横向夹在窗口内。
   // 顶边不够放时压缩气泡高度而不是压到宠物脸上：宁可气泡内部滚动，也别把宠物和面板按钮糊住。
   placeBubble() {

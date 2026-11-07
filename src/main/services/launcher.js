@@ -1,5 +1,6 @@
 const { shell } = require('electron');
 const { spawn } = require('node:child_process');
+const { spawnResult, explainSpawnError } = require('./spawn-result');
 
 async function launch(item) {
   const type = (item.type || 'path').toLowerCase();
@@ -16,9 +17,10 @@ async function launch(item) {
     }
     if (type === 'cmd') {
       const [exe, ...args] = target.split(/\s+/);
-      const child = spawn(exe, args, { detached: true, stdio: 'ignore', shell: true, windowsHide: true });
-      child.unref();
-      return { ok: true };
+      // 快捷方式里的 exe 打不开是常事（改过名、被安全软件拦），失败必须落在这条 Promise 上，
+      // 不能冒到主进程顶层
+      const res = await spawnResult(spawn, exe, args, { shell: true });
+      return res.ok ? { ok: true } : { ok: false, error: explainSpawnError(res.error) };
     }
     const result = await shell.openPath(target);
     return result ? { ok: false, error: result } : { ok: true };

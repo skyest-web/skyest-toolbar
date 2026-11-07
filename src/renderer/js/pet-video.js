@@ -49,6 +49,7 @@
     if (h.current === name && h.loop === loop && h.front.classList.contains('is-front')) return;
     h.current = name;
     h.loop = loop;
+    h.once = loop ? null : name;
     h.seq += 1;
     const seq = h.seq;
     const next = h.vids.find((v) => v !== h.front) || h.vids[0];
@@ -56,11 +57,18 @@
     next.loop = loop;
     next.onended = () => {
       if (seq !== h.seq) return;
-      // 表情片段播完一律回待机；换表情由 apply() 重新触发，不能在这里按 mood 反查
-      // （反查会拿到刚播完的那段，被 current 去重挡掉，宠物就定格在最后一帧）
+      h.once = null;
+      // 表情片段播完一律回待机/口型，且按**当下**的 talk 挑：提醒那一下的动作期间可能已经开始念，
+      // 也可能已经念完了。换表情不能在这里按 mood 反查（会拿到刚播完的那段，被 current 去重挡掉，
+      // 宠物就定格在最后一帧）——mood 换成一次性片段时由 apply() 直接触发，不走到这里。
       play(h, h.talk ? TALK : IDLE, true);
     };
-    next.src = url(name);
+    const target = url(name);
+    // 同一个 src 再赋一次值，Chrome 不会重跑加载算法：那条 video 还停在上一遍的最后一帧，
+    // play() 一调就 ended，宠物看着像「没反应」。片段是随机抽的，两条 video 来回换，
+    // 撞上同一个片段的概率不低，所以同值时手动 load() 把它倒回开头。
+    if (next.getAttribute('src') === target) next.load();
+    else next.src = target;
     const reveal = () => {
       if (seq !== h.seq) return;
       next.classList.add('is-front');
@@ -90,7 +98,7 @@
     host.innerHTML = '';
     const vids = [makeVideo(), makeVideo()];
     host.append(...vids);
-    const h = { host, vids, front: vids[0], current: null, loop: null, seq: 0, mood: 'calm', talk: false, paused: false };
+    const h = { host, vids, front: vids[0], current: null, loop: null, once: null, seq: 0, mood: 'calm', talk: false, paused: false };
     host.dataset.mood = 'calm';
     apply(h, options);
     return h;
@@ -103,6 +111,11 @@
     h.host.dataset.mood = h.mood;
     h.host.dataset.motion = h.paused ? 'off' : 'on';
     const clip = targetClip(h);
+    // 一次性动作（新邮件提醒、点一下的回应）正在播时，循环片段不掐它：状态照记，这一帧不切画面。
+    // 否则提醒里 speak() 那句 setSpeaking(true) → refresh('ai') 会在动作开始的同一帧把口型片段压上去，
+    // 「做个动作 + 念一句」就只剩念；片段播完由 onended 按当下的 talk 回到口型/待机。
+    // motion off 要立刻定格，所以那一档照切。
+    if (clip.loop && h.once && !h.paused) return h;
     play(h, clip.name, clip.loop);
     // motion:'off' 是唯一真省 CPU 的档位——定格当前帧，不再解码
     if (h.paused) h.vids.forEach((v) => v.pause());

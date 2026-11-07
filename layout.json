@@ -103,19 +103,60 @@
       ]
     },
     {
-      "id": "game",
-      "name": "游戏面板",
+      "id": "life",
+      "name": "生活面板",
+      "desktop": 1,
+      "grid": {
+        "columns": [
+          "330px",
+          "minmax(0, 1fr)",
+          "minmax(0, 1fr)",
+          "400px"
+        ],
+        "rows": [
+          "32px",
+          "176px",
+          "minmax(150px, 1fr)",
+          "78px"
+        ],
+        "areas": [
+          [
+            "topbar",
+            "topbar",
+            "topbar",
+            "topbar"
+          ],
+          [
+            "leftzone",
+            "gauges",
+            "gauges",
+            "workbench"
+          ],
+          [
+            "leftzone",
+            "slot1",
+            "slot2",
+            "clipboard"
+          ],
+          [
+            "dock",
+            "dock",
+            "dock",
+            "clipboard"
+          ]
+        ]
+      },
       "slots": [
         {
-          "at": "clock",
-          "label": "左上：时钟与主机信息",
-          "module": "placeholder",
+          "at": "leftzone",
+          "label": "左侧整块：原 clock+player 合并",
+          "module": "mail",
           "enabled": true
         },
         {
           "at": "gauges",
           "label": "中部上：系统指标（固定高度）",
-          "module": "placeholder",
+          "module": "photos",
           "enabled": true
         },
         {
@@ -125,21 +166,15 @@
           "enabled": true
         },
         {
-          "at": "player",
-          "label": "左下：音乐播放器",
-          "module": "placeholder",
-          "enabled": true
-        },
-        {
           "at": "slot1",
           "label": "中下左：占位",
-          "module": "placeholder",
+          "module": "player",
           "enabled": true
         },
         {
           "at": "slot2",
           "label": "中下右：占位",
-          "module": "placeholder",
+          "module": "video",
           "enabled": true
         }
       ]
@@ -147,11 +182,58 @@
     {
       "id": "work",
       "name": "工作面板",
+      "desktop": 2,
+      "grid": {
+        "columns": [
+          "330px",
+          "minmax(0, 1fr)",
+          "minmax(0, 1fr)",
+          "400px"
+        ],
+        "rows": [
+          "32px",
+          "176px",
+          "minmax(150px, 1fr)",
+          "78px"
+        ],
+        "areas": [
+          [
+            "topbar",
+            "topbar",
+            "topbar",
+            "topbar"
+          ],
+          [
+            "projzone",
+            "gitzone",
+            "gauges",
+            "workbench"
+          ],
+          [
+            "projzone",
+            "gitzone",
+            "slot2",
+            "clipboard"
+          ],
+          [
+            "dock",
+            "dock",
+            "dock",
+            "clipboard"
+          ]
+        ]
+      },
       "slots": [
         {
-          "at": "clock",
-          "label": "左上：时钟与主机信息",
-          "module": "placeholder",
+          "at": "projzone",
+          "label": "左侧整块：项目列表（原 clock+player 合并）",
+          "module": "projects",
+          "enabled": true
+        },
+        {
+          "at": "gitzone",
+          "label": "中部整块：git 状态（原 slot1 + gauges 左半合并）",
+          "module": "git",
           "enabled": true
         },
         {
@@ -163,18 +245,6 @@
         {
           "at": "workbench",
           "label": "右上",
-          "module": "placeholder",
-          "enabled": true
-        },
-        {
-          "at": "player",
-          "label": "左下：音乐播放器",
-          "module": "placeholder",
-          "enabled": true
-        },
-        {
-          "at": "slot1",
-          "label": "中下左：占位",
           "module": "placeholder",
           "enabled": true
         },
@@ -187,8 +257,49 @@
       ]
     },
     {
-      "id": "life",
-      "name": "生活面板",
+      "id": "game",
+      "name": "游戏面板",
+      "desktop": 3,
+      "grid": {
+        "columns": [
+          "330px",
+          "minmax(0, 1fr)",
+          "minmax(0, 1fr)",
+          "400px"
+        ],
+        "rows": [
+          "32px",
+          "176px",
+          "minmax(150px, 1fr)",
+          "78px"
+        ],
+        "areas": [
+          [
+            "topbar",
+            "topbar",
+            "topbar",
+            "topbar"
+          ],
+          [
+            "clock",
+            "gamezone",
+            "gamezone",
+            "workbench"
+          ],
+          [
+            "player",
+            "gamezone",
+            "gamezone",
+            "clipboard"
+          ],
+          [
+            "dock",
+            "dock",
+            "dock",
+            "clipboard"
+          ]
+        ]
+      },
       "slots": [
         {
           "at": "clock",
@@ -197,9 +308,9 @@
           "enabled": true
         },
         {
-          "at": "gauges",
-          "label": "中部上：系统指标（固定高度）",
-          "module": "placeholder",
+          "at": "gamezone",
+          "label": "中部整块：游戏列表",
+          "module": "games",
           "enabled": true
         },
         {
@@ -211,18 +322,6 @@
         {
           "at": "player",
           "label": "左下：音乐播放器",
-          "module": "placeholder",
-          "enabled": true
-        },
-        {
-          "at": "slot1",
-          "label": "中下左：占位",
-          "module": "placeholder",
-          "enabled": true
-        },
-        {
-          "at": "slot2",
-          "label": "中下右：占位",
           "module": "placeholder",
           "enabled": true
         }

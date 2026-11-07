@@ -38,17 +38,25 @@ function exePath(appRoot) {
   return fs.existsSync(p) ? p : null;
 }
 
-// 便携模式：Everything 把 ini 和 db 都放在 exe 旁边，而首跑留下的 ini 里 index=0——
-// 进程在、能连上、索引永远是空的。换机器 clone 完 vendor/ 里根本没有 ini，
-// 所以拉起前先补一份只含"要不要索引"的开关；卷 guid/路径清单这些跟机器绑定的键交给 Everything 自己扫。
-// 已经有人手工配过就别碰。
-const STARTER_INI = '[Everything]\r\nindex=1\r\nauto_include_fixed_volumes=1\r\nauto_include_removable_volumes=0\r\nipc=1\r\n';
+// 便携模式：Everything 把 ini 和 db 都放在 exe 旁边。这里只补「索引哪些卷 + 开 IPC」，
+// 卷 guid/路径清单这些跟机器绑定的键交给 Everything 自己扫。已经有人手工配过就别碰。
+//
+// 别再写 index=1：那是「改用替代索引」（和 index_file_list / index_etp_server 一族），
+// 空的 index_file_list 会被解析成「当前目录」，客户端启动时把它当文件列表打开，
+// 于是每次拉起都弹一个「无法打开文件列表: <exe 目录> 不是有效的文件列表」。默认值 0 才是本地索引。
+const STARTER_INI = '[Everything]\r\nauto_include_fixed_volumes=1\r\nauto_include_removable_volumes=0\r\nipc=1\r\n';
 
 function ensureHostConfig(exe) {
   if (!exe) return false;
   const ini = path.join(path.dirname(exe), 'Everything.ini');
-  if (fs.existsSync(ini)) return false;
-  fs.writeFileSync(ini, STARTER_INI, 'utf8');
+  if (!fs.existsSync(ini)) {
+    fs.writeFileSync(ini, STARTER_INI, 'utf8');
+    return true;
+  }
+  // 老版本 starter 写过的 index=1，就地改回默认 0
+  const text = fs.readFileSync(ini, 'utf8');
+  if (!/^index=1$/m.test(text)) return false;
+  fs.writeFileSync(ini, text.replace(/^index=1$/m, 'index=0'), 'utf8');
   return true;
 }
 

@@ -54,8 +54,8 @@ async function main() {
   if (!status.running && status.ipcDown && flag('start')) {
     const exe = exePath(APP_ROOT);
     console.log('Everything 没在跑，拉起:', exe);
-    if (ensureHostConfig(exe)) console.log('（补了一份 starter Everything.ini：index=1 + 固定卷全量索引）');
-    const child = spawn(exe, [], { detached: true, stdio: 'ignore' });
+    if (ensureHostConfig(exe)) console.log('（补/修了 Everything.ini：固定卷全量索引 + ipc，且把 index 归到默认 0）');
+    const child = spawn(exe, [], { detached: true, stdio: 'ignore', windowsHide: true });
     child.unref();
     status = await waitDb(sdk, 60000);
   }

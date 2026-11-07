@@ -138,13 +138,14 @@ class EverythingSearch {
     if (!exe) return { ok: false, message: '没找到 vendor/everything/app/everything.exe' };
     this.hostStarting = (async () => {
       try {
-        // 缺 ini 时补一份 starter（index=1，见 everything-sdk.js）；写不进去就算了，别挡住拉起
+        // 缺 ini 时补一份 starter；已有 index=1 的老 ini 就地修回 0（都见 everything-sdk.js）。写不进去就算了，别挡住拉起
         try {
           ensureHostConfig(exe);
         } catch {
           this.report({ lastError: '没能写入 vendor/everything/app/Everything.ini' });
         }
-        spawn(exe, [], { detached: true, stdio: 'ignore' }).unref();
+        // Everything 是 GUI 程序，不带 windowsHide 会在桌面弹一个满屏窗口；藏起来不影响 SDK 查询
+        spawn(exe, [], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
       } catch (error) {
         this.hostStarting = null;
         this.report({ lastError: `拉起 Everything 失败：${error.message}` });

@@ -9,6 +9,8 @@ const displayResolver = require('./display');
 const metrics = require('./services/metrics');
 const launcher = require('./services/launcher');
 const music = require('./services/music');
+const video = require('./services/video');
+const photos = require('./services/photos');
 const { Store } = require('./services/store');
 const { ClipboardHistory } = require('./services/clipboard-history');
 const { AiChat } = require('./services/ai');
@@ -18,6 +20,14 @@ const { Voice } = require('./services/voice');
 const { DshHost } = require('./services/dsh');
 const { DshWindow } = require('./services/dsh-window');
 const { EverythingSearch } = require('./services/everything');
+const { Trainers } = require('./services/trainers');
+const { Steam } = require('./services/steam');
+const { Library } = require('./services/library');
+const { Projects } = require('./services/projects');
+const { Git } = require('./services/git');
+const { Mail } = require('./services/mail');
+const { Bili } = require('./services/bili');
+const { VdesktopFollow } = require('./services/vdesktop-follow');
 
 const APP_ROOT = path.resolve(__dirname, '..', '..');
 const COMPONENT_DIR = path.join(APP_ROOT, 'src', 'renderer', 'js', 'components');
@@ -43,13 +53,28 @@ let voice = null;
 let dsh = null;
 let dshWindow = null;
 let everything = null;
+let trainers = null;
+let steam = null;
+let library = null;
+let projects = null;
+let git = null;
+let mail = null;
+let bili = null;
 let placement = null;
 let fastTimer = null;
 let slowTimer = null;
+let vdesktopFollow = null;
+let recreating = false;
+let lastRecreateAt = 0;
+// 「是我们自己让桌面跳到第 N 个」的记号：看护回来的 desk|N 因此不再反查面板，
+// 免得 面板→桌面→面板→桌面 来回打乒乓。超时清掉，防止一次失败的切换把记号永久挂住。
+let pendingDesktop = null;
+let pendingDesktopTimer = null;
 
-// 音频经自定义协议读取：本地文件用 file:// 直连媒体元素会被 Chromium 的跨源策略挡住。
+// 音频 / 视频经自定义协议读取：本地文件用 file:// 直连媒体元素会被 Chromium 的跨源策略挡住。
 // corsEnabled + Access-Control-Allow-Origin 是为了让 WebAudio 的 AnalyserNode 能读到频谱数据
-// （跨源但没声明 CORS 的媒体会被"污染"，analyse 出来永远是 0）。
+// （跨源但没声明 CORS 的媒体会被"污染"，analyse 出来永远是 0）；视频用不到频谱，但同一个 handler
+// 同时服务播放器那一格，权限照旧开着最省事。
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'track',
@@ -66,6 +91,12 @@ function trackPath(requestUrl) {
   return decodeURIComponent(encoded);
 }
 
+// 音频 / 视频 / 下载都走这一条：扩展名在音频表里就查音频表，否则查视频表。
+// 两边都查不到会回 application/octet-stream，浏览器就当下载处理——不会黑屏骗人。
+function mediaMime(filePath) {
+  return music.AUDIO_EXT.has(path.extname(filePath).toLowerCase()) ? music.mimeFor(filePath) : video.mimeFor(filePath);
+}
+
 function registerTrackProtocol() {
   protocol.handle('track', (request) => {
     const filePath = trackPath(request.url);
@@ -74,7 +105,7 @@ function registerTrackProtocol() {
     const baseHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': '*',
-      'Content-Type': music.mimeFor(filePath),
+      'Content-Type': mediaMime(filePath),
       'Accept-Ranges': 'bytes'
     };
 
@@ -139,6 +170,85 @@ function createWindow() {
   if (process.argv.includes('--dev')) win.webContents.openDevTools({ mode: 'detach' });
 }
 
+// 窗口只会落在「创建它时活动的那个虚拟桌面」上，跨桌面又没有能让窗口常驻或搬走的对外
+// API（MoveWindowToDesktop 对别的进程的窗口返回 E_ACCESSDENIED），所以跟随只能靠重建：
+// 助手脚本只读探测，这里销毁旧窗口再走一遍 createWindow，新窗口就落在当前桌面上。
+// 代价是一次约 200–400ms 的重载闪动、正在流式的回复会被打断；面板、播放器进度、聊天
+// 历史与剪贴板都在 state.json / 主进程内存里，重建后原样回来。
+function recreateWindow(reason) {
+  if (recreating || !win || win.isDestroyed()) return;
+  // 兜住最坏情况：万一重建后仍然判定为「不在当前桌面」，5 秒内不再重建，
+  // 免得看护事件变成无限重启窗口的循环
+  if (Date.now() - lastRecreateAt < 5000) {
+    console.warn(`[vdesk] 距上次重建不足 5 秒，跳过这次（${reason}）`);
+    return;
+  }
+  recreating = true;
+  lastRecreateAt = Date.now();
+  console.log(`[vdesk] 工具栏不在当前桌面，重建窗口以跟随（${reason}）`);
+  try {
+    // destroy 而不是 close：close 会走 'close' 事件，而 'close' 在我们的用法里可能被别处拦截
+    win.destroy();
+  } catch (err) {
+    console.warn(`[vdesk] 销毁旧窗口失败：${err.message}`);
+  }
+  win = null;
+  try {
+    createWindow();
+  } catch (err) {
+    console.error(`[vdesk] 重建窗口失败：${err.message}`);
+  }
+  recreating = false;
+}
+
+// ---------- 面板 ↔ 虚拟桌面 ----------
+// layout.json 里给面板写了 desktop: N（1 起，任务视图从左到右）就绑这一块；
+// 没写（主界面）就是「切面板不动桌面」。绑了的面板不够数时只在已有桌面里切，
+// 绝不自动创建桌面。开关沿用 window.followVirtualDesktop：关掉两半都不工作。
+function markPendingDesktop(index) {
+  pendingDesktop = index;
+  if (pendingDesktopTimer) clearTimeout(pendingDesktopTimer);
+  pendingDesktopTimer = setTimeout(() => {
+    pendingDesktopTimer = null;
+    pendingDesktop = null;
+  }, 8000);
+}
+
+function clearPendingDesktop() {
+  pendingDesktop = null;
+  if (pendingDesktopTimer) {
+    clearTimeout(pendingDesktopTimer);
+    pendingDesktopTimer = null;
+  }
+}
+
+// 他点页签 → 跳到那个面板绑的桌面。切完桌面后工具栏会被看护报一次 off，进而重建窗口
+// （200~400ms 的闪）——那是这条路的既有限制，不是新引入的 bug；这台 26300 上窗口本来
+// 没有桌面归属，实测不会触发，详见 docs/virtual-desktop-follow.md §6。
+async function syncDesktopForPage(pageId) {
+  if (!vdesktopFollow?.enabled) return;
+  const index = layoutStore.desktopOfPage(layout, pageId);
+  if (index === null) return;
+  if (vdesktopFollow.desktopIndex === index && pendingDesktop === null) return;
+  markPendingDesktop(index);
+  const result = await vdesktopFollow.switchTo(index);
+  // 切成功了就立刻把记号交回给看护的确认流（下面 onDesktopIndex 负责清），
+  // 失败/range 也留着记号到超时，避免紧接着又重试一次同样的失败。
+  if (!result.ok && pendingDesktop === index) clearPendingDesktop();
+}
+
+// 他用 Win+Ctrl+←/→ 切桌面 → 反过来切到绑在这个桌面上的面板。
+function onDesktopIndex(index, count) {
+  // 走到这里说明桌面确实变了：不管是我们要的那一个，还是他中途自己切的，记号都作废
+  if (pendingDesktop !== null) clearPendingDesktop();
+  if (!vdesktopFollow?.enabled) return;
+  const pageId = layoutStore.pageOfDesktop(layout, index);
+  if (!pageId || store.get('activePage') === pageId) return;
+  store.set('activePage', pageId);
+  // 只发同步，不回头调 syncDesktopForPage：这一半是桌面引起的，不能再把桌面切回去
+  push('page:sync', { page: pageId, reason: `桌面 ${index + 1}/${count ?? '?'}` });
+}
+
 function push(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
@@ -190,6 +300,7 @@ function registerIpc() {
     tasks: store.get('tasks'),
     notes: store.get('notes'),
     player: store.get('player'),
+    video: store.get('video'),
     clipboard: clipboardHistory.list(),
     ai: { messages: aiChat.messages, key: aiKey.status() },
     voice: voice ? voice.status() : null,
@@ -228,12 +339,25 @@ function registerIpc() {
 
   // 只认 layout 里真的存在的面板 id：渲染层递来一个陌生 id（旧 state.json、手改的文件）就忽略，
   // 别把无效值存回去，否则下次启动 boot 读到一个不存在的面板，界面直接空一半
-  ipcMain.handle('page:set', (_event, pageId) => {
-    const id = String(pageId || '');
+  ipcMain.handle('page:set', (_event, pageId) => {    const id = String(pageId || '');
     if (!layout.pages.some((page) => page.id === id)) return { ok: false, message: `没有面板 "${id}"` };
+    const changed = store.get('activePage') !== id;
     store.set('activePage', id);
+    // 只有真的换了面板才动桌面：重复收到同一个 id（比如渲染层重绘）再去切一次，
+    // 会白闪一下窗口。changed 同时是第二道防打乒乓的闸——桌面那半边不再走这条 IPC。
+    if (changed) syncDesktopForPage(id);
     return { ok: true, page: id };
   });
+
+  // 看护的实况：现在第几个虚拟桌面、一共几个、工具栏在不在上面、绑了哪些面板。
+  // 自检探针靠它读桌面（而不是自己每 200ms 起一个 powershell——那本身会把前台拽回
+  // 命令行所在的那个桌面，把要测的东西搅乱），设置面板将来要显示也用它。
+  ipcMain.handle('vdesk:status', () => ({
+    ...(vdesktopFollow ? vdesktopFollow.status() : { supported: process.platform === 'win32', enabled: false, watching: false }),
+    activePage: store.get('activePage'),
+    pendingDesktop,
+    bindings: layout.pages.map((page) => ({ id: page.id, desktop: page.desktop ?? null }))
+  }));
 
   ipcMain.handle('displays:list', () => displayResolver.list());
 
@@ -247,6 +371,44 @@ function registerIpc() {
   });
 
   ipcMain.handle('music:lyrics', (_event, track) => music.lyricsFor(track));
+
+  // 视频库：扫的是 config 里那个文件夹，渲染层递进来的路径只用来选默认打开位置，不当读文件的入口
+  ipcMain.handle('video:scan', (_event, folder) => {
+    const target = folder || config.video.folder;
+    const result = video.scan(target, { recursive: config.video.recursive });
+    return { ...result, clips: result.clips.map((clip) => ({ ...clip, url: trackUrl(clip.path) })), folder: target };
+  });
+
+  ipcMain.handle('video:pickFolder', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: '选择视频文件夹',
+      defaultPath: config.video.folder || app.getPath('videos'),
+      properties: ['openDirectory']
+    });
+    if (canceled || !filePaths.length) return null;
+    config = configStore.merge(config, { video: { ...config.video, folder: filePaths[0] } });
+    configStore.save(APP_ROOT, config);
+    return filePaths[0];
+  });
+
+  // 照片墙：图片直接给 file:///（<img> 不受媒体元素那条跨源策略限制），所以不走 track://，
+  // url 在 service 里就拼好了；这里只负责「扫哪个文件夹」和把选中的目录写回配置。
+  ipcMain.handle('photos:scan', (_event, folder) => {
+    const target = folder || config.photos.folder;
+    return { ...photos.scan(target, { recursive: config.photos.recursive, limit: config.photos.limit }), folder: target };
+  });
+
+  ipcMain.handle('photos:pickFolder', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: '选择照片文件夹',
+      defaultPath: config.photos.folder || app.getPath('pictures'),
+      properties: ['openDirectory']
+    });
+    if (canceled || !filePaths.length) return null;
+    config = configStore.merge(config, { photos: { ...config.photos, folder: filePaths[0] } });
+    configStore.save(APP_ROOT, config);
+    return filePaths[0];
+  });
 
   ipcMain.handle('dock:pickPath', async (_event, kind) => {
     const options = {
@@ -275,6 +437,99 @@ function registerIpc() {
     return filePaths[0];
   });
 
+  // 修改器：列表由主进程扫（路径只从 config 来），启动/定位只认这次缓存里的 id
+  ipcMain.handle('trainers:list', (_event, force) => trainers.scan(Boolean(force)));
+  ipcMain.handle('trainers:launch', (_event, id, elevated) => trainers.launch(id, { elevated: Boolean(elevated) }));
+  ipcMain.handle('trainers:reveal', (_event, id) => trainers.reveal(id));
+
+  ipcMain.handle('trainers:pickFolder', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: '选择修改器文件夹',
+      defaultPath: config.trainers.folder || undefined,
+      properties: ['openDirectory']
+    });
+    if (canceled || !filePaths.length) return null;
+    config = configStore.merge(config, { trainers: { ...config.trainers, folder: filePaths[0] } });
+    configStore.save(APP_ROOT, config);
+    return filePaths[0];
+  });
+
+  // Steam 库：读 appmanifest_*.acf，启动只把 appid 拼成 steam://rungameid/ 交给客户端
+  ipcMain.handle('steam:list', (_event, force) => steam.scan(Boolean(force)));
+  ipcMain.handle('steam:launch', (_event, id) => steam.launch(id));
+  ipcMain.handle('steam:reveal', (_event, id) => steam.reveal(id));
+
+  ipcMain.handle('steam:pickFolder', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: '选择 Steam 库（SteamLibrary 或它的 steamapps 都行）',
+      defaultPath: config.steam.folder || undefined,
+      properties: ['openDirectory']
+    });
+    if (canceled || !filePaths.length) return null;
+    config = configStore.merge(config, { steam: { ...config.steam, folder: filePaths[0] } });
+    configStore.save(APP_ROOT, config);
+    return filePaths[0];
+  });
+
+  // 游戏列表：Steam 库 + 修改器 + 别名表 + 本地图标拼成一份行数据。
+  // 只读不启动——点游戏名走上面的 steam:launch，点标签走 trainers:launch，用的都是各自那批缓存 id。
+  ipcMain.handle('library:list', (_event, force) => library.list(Boolean(force)));
+
+  // 项目列表（工作面板左下那一格）：扫 repos.roots 那几个根的顶层文件夹，启动是把项目路径交给判出来的那个 IDE。
+  // 和 steam / trainers 同一条规矩：只认这次缓存里的 id，渲染层递不进任何路径或 exe。
+  ipcMain.handle('projects:list', (_event, force) => projects.scan(Boolean(force)));
+  ipcMain.handle('projects:launch', (_event, id) => projects.launch(id));
+  ipcMain.handle('projects:reveal', (_event, id) => projects.reveal(id));
+
+  // git 状态（工作面板中间那一整块）：不自己扫盘，看哪个仓库由左边项目格选中，id 就是项目格那行的 id。
+  // id 不给或对不上时服务直接回一句「要先选项目」，一个 git 进程都不起。
+  // 写侧四条（抓取 / 拉取 / 提交 / 推送）全走两步：prepare 只换一个一次性 nonce 回去，
+  // confirm 才真起 git 进程——所以渲染层在「确认」这一步递不进任何参数，push 这种别人看得见的动作
+  // 没有绕开确认条的入口。nonce 不做强转：类型不对要留给服务那句「确认码不对」判。
+  ipcMain.handle('git:status', (_event, force, id) => git.refresh(Boolean(force), id));
+  ipcMain.handle('git:prepare', (_event, id, op, extra) => git.prepare(id, op, extra || {}));
+  ipcMain.handle('git:confirm', (_event, nonce) => git.confirm(nonce));
+  ipcMain.handle('git:cancel', (_event, nonce) => git.cancel(nonce));
+
+  // 点一个改动文件：绝对路径由 git 服务从「项目行的目录 + 这一格缓存的相对路径」拼出来，
+  // 在这儿交给项目格——用哪个 IDE 是它判的（第二个视图不另判一套）。回给渲染层的只有项目名和相对路径。
+  ipcMain.handle('git:openFile', async (_event, id, index) => {
+    const hit = git.fileTarget(id, index);
+    if (!hit.ok) return hit;
+    const res = await projects.openFile(hit.projectId, hit.path);
+    return res.ok ? { ...res, file: hit.file } : res;
+  });
+
+  // 仓库根目录（项目格与 git 格共用）：这条只开目录框把选中的路径**还给设置卡片**，
+  // 不在这一步落盘——那一路是数组，落盘要等「保存并应用」一起写，免得半条配置先进磁盘。
+  ipcMain.handle('repos:pickFolder', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: '添加一个仓库根目录（它下面的每个文件夹算一个项目）',
+      defaultPath: (config.repos?.roots || [])[0] || undefined,
+      properties: ['openDirectory']
+    });
+    if (canceled || !filePaths.length) return null;
+    return filePaths[0];
+  });
+
+  // 邮箱：只读取件箱头部。授权码即时加密写进 userData/mail-auth.bin，不跟随「保存并应用」，
+  // 也永不跨 IPC 回传——mail:status 里只有 set/hint（位数 + 尾两字）。
+  ipcMain.handle('mail:status', () => mail.status());
+  ipcMain.handle('mail:list', (_event, force) => mail.list(Boolean(force)));
+  ipcMain.handle('mail:openWebmail', () => mail.openWebmail());
+  ipcMain.handle('mail:setAuth', (_event, value) => mail.setAuth(value));
+  ipcMain.handle('mail:clearAuth', () => mail.clearAuth());
+
+  // B 站（只读列表 + 交给浏览器打开）。出网全在 services/bili.js 那一层，
+  // SESSDATA 即时加密写进 userData/bili-auth.bin，不跟随「保存并应用」，也永不跨 IPC 回传——
+  // bili:status 里只有 set/hint/logged/mid/uname。渲染层只能递 section 名和刚返回的行 id。
+  ipcMain.handle('bili:status', () => bili.status());
+  ipcMain.handle('bili:list', (_event, section, opts) => bili.list(section, { force: Boolean(opts?.force), folderId: opts?.folderId }));
+  ipcMain.handle('bili:open', (_event, id) => bili.open(id));
+  ipcMain.handle('bili:setAuth', (_event, value) => bili.setAuth(value));
+  ipcMain.handle('bili:clearAuth', () => bili.clearAuth());
+  ipcMain.handle('bili:check', () => bili.check());
+
   ipcMain.handle('tasks:save', (_event, tasks) => {
     store.set('tasks', tasks);
     return true;
@@ -285,6 +540,12 @@ function registerIpc() {
   });
   ipcMain.handle('player:save', (_event, player) => {
     store.set('player', player);
+    return true;
+  });
+
+  // 上次看到哪一条、看到第几秒：和播放器一样存 state.json（userData），不进 toolbar.config.json
+  ipcMain.handle('video:save', (_event, video) => {
+    store.set('video', video);
     return true;
   });
 
@@ -377,6 +638,13 @@ function applyPolling() {
   }
   if (aiChat) aiChat.syncPersistence();
   if (voice) voice.sync();
+  // 邮箱的看护轮询：间隔 / 开关 / 提醒改了都要立刻生效，且只允许这一条定时器
+  if (mail) mail.sync();
+  if (vdesktopFollow) {
+    vdesktopFollow.sync();
+    // 开关关掉时 pending 的桌面确认永远不会再来，留着记号会吃掉下一次合法的面板切换
+    clearPendingDesktop();
+  }
   startTicker();
 }
 
@@ -393,6 +661,16 @@ if (!gotLock) {
     store = new Store(app.getPath('userData'));
 
     createWindow();
+
+    // 虚拟桌面跟随：助手只读探测，判断和重建都在本进程（见 services/vdesktop-follow.js
+    // 顶部注释：跨进程 MoveWindowToDesktop 是 E_ACCESSDENIED，所以只能重建）。
+    vdesktopFollow = new VdesktopFollow({
+      getConfig: () => config,
+      getWindow: () => win,
+      onOffDesktop: (detail) => recreateWindow(detail),
+      onDesktop: (index, count) => onDesktopIndex(index, count)
+    });
+    vdesktopFollow.start();
 
     clipboardHistory = new ClipboardHistory(config.clipboard);
     clipboardHistory.onChange((items) => push('clipboard:update', items));
@@ -422,6 +700,40 @@ if (!gotLock) {
     everything = new EverythingSearch({ appRoot: APP_ROOT, getConfig: () => config, emit: push });
     everything.probe().catch(() => {});
 
+    // 修改器列表：不常驻、不预扫，渲染层要的时候才扫目录；路径只从 config 读
+    trainers = new Trainers({ getConfig: () => config });
+
+    // Steam 库：同上，只在渲染层要列表时读 appmanifest；启动走 steam:// 协议交给客户端
+    steam = new Steam({ getConfig: () => config });
+
+    // 游戏列表：把上面两个服务已经缓存好的结果拼起来，本身不再扫第二遍目录
+    library = new Library({ steam, trainers });
+
+    // 项目列表（工作面板左下那一格）：根目录现读 config.repos.roots（项目格和 git 格共用这一份），
+    // 没配就兜回服务里的 D:\GitProject。IDE 的位置每次 force 重扫才重新找一遍。
+    projects = new Projects({ getRoots: () => config.repos?.roots });
+
+    // git 状态（工作面板中间那一整块）：不自己扫盘，看哪个仓库由左边项目格的选中决定。
+    // 给的是 projects **服务本身**而不是某一行的快照——「git 格是项目格的第二个视图」要在代码里成立，
+    // 两格共用同一批行、同一套 id，点了改动文件才能找回项目格判出来的那个 IDE。
+    git = new Git({ getProjects: () => projects });
+
+    // 邮箱（163 IMAP，只读头部）：不预连、不预拉，组件第一次要数据才握手。
+    // 授权码跟着 userData 走，所以这里只给目录，不传值。
+    // onEvent 是往渲染层推 mail:updated / mail:new 的那条路——新邮件的判定只能在主进程做，
+    // 停在别的面板时生活面板那个组件根本不存在，没有 DOM 就没有轮询。
+    mail = new Mail({
+      getConfig: () => config,
+      dir: app.getPath('userData'),
+      onEvent: (channel, payload) => push(channel, payload)
+    });
+    // applyPolling() 只在「保存并应用」时跑，开机这一趟得自己起，否则第一次启动后要等下一次保存才有提醒
+    mail.sync();
+
+    // B 站（只读列表 + 交给浏览器打开）：不预连、不预拉，渲染层第一次切到 B 站那一档才问 nav。
+    // SESSDATA 跟着 userData 走（DPAPI），所以这里只给目录，不传值；这一段没有任何 config 字段。
+    bili = new Bili({ dir: app.getPath('userData') });
+
     aiChat = new AiChat({
       store,
       getKey: () => aiKey.get(),
@@ -441,14 +753,22 @@ if (!gotLock) {
 
   app.on('before-quit', () => {
     stopTicker();
+    if (vdesktopFollow) vdesktopFollow.stop();
     if (clipboardHistory) clipboardHistory.stop();
     if (voice) voice.shutdown();
     if (dshWindow) dshWindow.destroy();
     if (dsh) dsh.stop();
     // Everything 客户端不在这里收：它可能是用户自己开的，也可能被顶栏搜索拉起来当常驻索引用
     if (everything) everything.dispose();
+    // 邮箱那条 IMAP 连接走 logout，别留半开的 TLS 会话给 163 记着
+    if (mail) mail.dispose();
     if (store) store.flush();
   });
 
-  app.on('window-all-closed', () => app.quit());
+  app.on('window-all-closed', () => {
+    // 跟随虚拟桌面时走的是 destroy + create：旧窗口已销毁、新窗口还没建的这一瞬间，
+    // 这条事件会照常发过来。这时候不能退，否则「切桌面」就变成了「关应用」。
+    if (recreating) return;
+    app.quit();
+  });
 }

@@ -1,3 +1,20 @@
+// 仓库根目录那栏：一行一个路径，去掉空行和重复（Windows 路径不分大小写）。
+// 主进程 services/projects.js 里的 normalizeRoots 是同一条规矩；这边只做输入清洗，
+// 两边各留一份是因为渲染层不该为了洗一行字符串去够主进程。
+function uniqueRoots(lines) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of lines || []) {
+    const line = String(raw || '').trim();
+    if (!line) continue;
+    const key = line.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(line);
+  }
+  return out;
+}
+
 TB.settings = {
   init(root) {
     this.root = root;
@@ -74,6 +91,7 @@ TB.settings = {
       tolerance: this.number(config.display.match.tolerance, 0, 500)
     };
     const alwaysOnTop = this.checkbox(config.window.alwaysOnTop);
+    const followVirtualDesktop = this.checkbox(config.window.followVirtualDesktop);
     const current = state.placement
       ? `${state.placement.source} → ${state.placement.bounds.width}x${state.placement.bounds.height} @(${state.placement.bounds.x},${state.placement.bounds.y})`
       : '--';
@@ -97,6 +115,60 @@ TB.settings = {
     });
     const musicRecursive = this.checkbox(config.music.recursive);
     const musicVolume = this.number(Math.round(config.music.volume * 100), 0, 100, 5);
+
+    // ----- 修改器（trainer）-----
+    const trainersFolder = TB.util.el('input', {
+      class: 'input',
+      type: 'text',
+      value: config.trainers.folder,
+      placeholder: '例如 H:\\GAMES\\FLiNGTrainers\\GCM Trainers'
+    });
+    const trainersBrowse = TB.util.el('button', {
+      class: 'ghost-btn',
+      text: '浏览…',
+      onclick: async () => {
+        const picked = await TB.api.trainers.pickFolder();
+        if (picked) trainersFolder.value = picked;
+      }
+    });
+
+    // ----- Steam 库 -----
+    const steamFolder = TB.util.el('input', {
+      class: 'input',
+      type: 'text',
+      value: config.steam.folder,
+      placeholder: '例如 H:\\GAMES\\SteamLibrary\\steamapps'
+    });
+    const steamBrowse = TB.util.el('button', {
+      class: 'ghost-btn',
+      text: '浏览…',
+      onclick: async () => {
+        const picked = await TB.api.steam.pickFolder();
+        if (picked) steamFolder.value = picked;
+      }
+    });
+
+    // ----- 仓库根目录（项目格 + git 格共用这一份）-----
+    // 数组型配置在这套设置面板里没有先例，走「一行一个路径」的 textarea：
+    // 增删就是改行，和上面那些单行输入一样跟着「保存并应用」走，不做即时落盘。
+    const reposRoots = TB.util.el('textarea', {
+      class: 'input repos-roots',
+      rows: '3',
+      spellcheck: 'false',
+      placeholder: 'D:\\GitProject'
+    });
+    // textarea 的 value 不是反射属性，走 setAttribute 填不进去（和上面 aiSystem 同一个写法）
+    reposRoots.value = (config.repos?.roots || []).join('\n');
+    const reposBrowse = TB.util.el('button', {
+      class: 'ghost-btn',
+      text: '浏览…加一条',
+      onclick: async () => {
+        const picked = await TB.api.repos.pickFolder();
+        if (!picked) return;
+        // Windows 路径不分大小写，比对也按小写来，不然能连加两条只差大小写的
+        reposRoots.value = uniqueRoots([...reposRoots.value.split('\n'), picked]).join('\n');
+      }
+    });
 
     // ----- AI（密钥即时加密写入 userData/ai-key.bin，不跟随「保存并应用」） -----
     const keyState = state.ai?.key || { set: false, hint: null };
@@ -305,9 +377,195 @@ TB.settings = {
     );
     searchCard.dataset.card = 'search';
 
+    // ----- 邮箱（163 IMAP，只读）-----
+    // 授权码和 DeepSeek 密钥一样即时加密落盘，不跟着「保存并应用」走，也不回传到渲染层：
+    // 这里只拿得到 set / hint（位数 + 尾两字）。
+    const mailAuthHint = TB.util.el('span', {
+      class: 'field-hint',
+      text: '授权码只加密存在 userData/mail-auth.bin，不写进 toolbar.config.json'
+    });
+    const mailInput = TB.util.el('input', { class: 'input', type: 'password', placeholder: '163 的客户端授权密码', spellcheck: 'false', autocomplete: 'off' });
+    const mailSaveAuth = TB.util.el('button', {
+      class: 'ghost-btn',
+      text: '保存授权码',
+      onclick: async () => {
+        const result = await TB.api.mail.setAuth(mailInput.value);
+        if (!result.ok) return TB.app.toast(result.error, 'error');
+        mailInput.value = '';
+        mailInput.placeholder = `已保存 ${result.hint}`;
+        mailAuthHint.textContent = `已加密保存（${result.hint}），换机需重填`;
+        TB.app.toast('授权码已加密保存', 'ok');
+        if (TB.mail) {
+          TB.mail.data = null;
+          TB.mail.load(true);
+        }
+      }
+    });
+    const mailClearAuth = TB.util.el('button', {
+      class: 'ghost-btn',
+      text: '清除',
+      onclick: async () => {
+        await TB.api.mail.clearAuth();
+        mailInput.value = '';
+        mailInput.placeholder = '163 的客户端授权密码';
+        mailAuthHint.textContent = '已清除：下一次读取会提示还没保存授权码';
+      }
+    });
+
+    const mailStatus = TB.util.el('span', { class: 'field-hint', text: '正在问主进程…' });
+    const fillMailStatus = (st) => {
+      mailStatus.textContent = !st.account
+        ? '还没填邮箱地址，填完点上面的「保存授权码」就能拉了'
+        : !st.auth.set
+          ? `账号 ${st.account} 已填，缺授权码（163 网页设置 → POP3/SMTP/IMAP 里那串，不是登录密码）`
+          : st.lastError
+            ? `上次失败：${st.lastError}`
+            : st.stats?.total
+              ? `${st.host}:${st.port} · 已拉到 ${st.stats.window}/${st.stats.total} 封，未读 ${st.stats.unseen}`
+              : `${st.host}:${st.port} · 还没拉过，等生活面板那一格或点下面「立刻拉一次」`;
+    };
+    const mailTry = TB.util.el('button', {
+      class: 'ghost-btn',
+      text: '立刻拉一次',
+      onclick: async () => {
+        mailStatus.textContent = '连接中…';
+        const result = await TB.api.mail.list(true);
+        const st = await TB.api.mail.status();
+        fillMailStatus(st);
+        if (result?.error) TB.app.toast(result.error, 'error');
+        else TB.app.toast(`已拉取 ${result.rows.length} 封（未读 ${result.stats.unseen}）`, 'ok');
+        TB.mail.data = result;
+        TB.mail.render?.();
+      }
+    });
+    TB.api.mail.status().then(fillMailStatus).catch((err) => (mailStatus.textContent = `问主进程失败：${err.message}`));
+
+    const mailEnabled = this.checkbox(config.mail.enabled);
+    const mailAccount = TB.util.el('input', { class: 'input', type: 'text', value: config.mail.account, placeholder: 'abc@163.com', spellcheck: 'false' });
+    const mailHost = TB.util.el('input', { class: 'input', type: 'text', value: config.mail.host, spellcheck: 'false' });
+    const mailPort = this.number(config.mail.port, 1, 65535, 1);
+    const mailBox = TB.util.el('input', { class: 'input', type: 'text', value: config.mail.mailbox, spellcheck: 'false' });
+    const mailMax = this.number(config.mail.maxMessages, 1, 200, 5);
+    const mailPoll = this.number(config.mail.pollMs, 0, 3600000, 30000);
+    const mailTimeout = this.number(config.mail.timeoutMs, 3000, 60000, 1000);
+    const mailWeb = TB.util.el('input', { class: 'input', type: 'text', value: config.mail.webmail, spellcheck: 'false' });
+    const mailNotify = this.checkbox(config.mail.notify);
+    const mailNotifyVoice = this.checkbox(config.mail.notifyVoice);
+
+    const mailCard = this.card(
+      '邮箱（163 · IMAP 只读）',
+      this.field('启用', mailEnabled, '关掉后生活面板那一格直接报「邮箱在设置里被关了」，也不再做定时拉取'),
+      this.field('账号', mailAccount, '完整地址，形如 abc@163.com；别的服务商改下面的服务器就行'),
+      this.field('服务器', TB.util.el('div', { class: 'inline' }, [mailHost, mailPort]), '163 是 imap.163.com:993（SSL）。这一格只读取件箱头部，不标已读、不删不移'),
+      this.field('邮箱目录', mailBox, '收件箱就叫 INBOX，一般不用动'),
+      this.field('每次拉取', mailMax, '取最近多少封的头部（上限 200）；未读数按整个收件箱算，不受这个数限制'),
+      this.field('自动刷新 (ms)', mailPoll, '由主进程隔多久拉一次（下限 30 秒，填 0 只认手动「刷新」）——停在哪个面板都照拉，新邮件提醒靠它。163 对频繁重连会限流'),
+      this.field('新邮件提醒', mailNotify, '来了新邮件让宠物做个动作并弹提示条。判定在主进程做，所以停在别的面板也收得到；开机第一次拉取只打基线，不会把旧未读一起报出来'),
+      this.field('语音提示', mailNotifyVoice, '提醒时念一句固定模板（「邮箱来了 3 封新邮件」），直接喂本机 TTS，一次都不请求 DeepSeek；正在念 AI 回复时不插嘴'),
+      this.field('超时 (ms)', mailTimeout, '握手加拉取整趟的时限，超了报「连不上」，不会把这一格挂死'),
+      this.field('网页地址', mailWeb, '点「网页邮箱」时交给系统浏览器的地址——要回信只能去网页端'),
+      this.field('授权码', TB.util.el('div', { class: 'inline' }, [mailInput, mailSaveAuth, mailClearAuth]), mailAuthHint),
+      this.field('连接状态', TB.util.el('div', { class: 'inline' }, [mailStatus, mailTry]))
+    );
+    mailCard.dataset.card = 'mail';
+
+    // ----- Bilibili（生活面板「视频」那一格的 B站档）-----
+    // 和 163 授权码、DeepSeek 密钥一样：即时加密落盘，不跟着「保存并应用」走，也不回传值——
+    // 这里只拿得到 set / hint（位数 + 尾两字）和登录后的账号名。这一段没有任何 config 字段：
+    // 能配的只有「读哪个站点的哪三张单子」，那是代码里写死的，填出来只会多一个改坏的机会。
+    const biliAuthHint = TB.util.el('span', {
+      class: 'field-hint',
+      text: 'SESSDATA 只加密存在 userData/bili-auth.bin，不进 toolbar.config.json、不进界面数据；粘整串 cookie 也认，只取 SESSDATA 那一个值'
+    });
+    const biliInput = TB.util.el('input', {
+      class: 'input',
+      type: 'password',
+      placeholder: '浏览器 F12 → Cookies → www.bilibili.com → SESSDATA',
+      spellcheck: 'false',
+      autocomplete: 'off'
+    });
+    const biliSaveAuth = TB.util.el('button', {
+      class: 'ghost-btn',
+      text: '保存 cookie',
+      onclick: async () => {
+        const result = await TB.api.bili.setAuth(biliInput.value);
+        if (!result.ok) return TB.app.toast(result.error, 'error');
+        biliInput.value = '';
+        biliInput.placeholder = `已保存 ${result.hint}`;
+        biliAuthHint.textContent = `已加密保存（${result.hint}），换机或 B 站改密后要重填`;
+        TB.app.toast('B 站 cookie 已加密保存', 'ok');
+        // 缓存里那些行是上一个账号的观看记录，换 cookie 之后必须重问一遍
+        resetBiliCell(true);
+        const check = await TB.api.bili.check();
+        fillBiliStatus(check.ok ? await TB.api.bili.status() : check);
+      }
+    });
+    const biliClearAuth = TB.util.el('button', {
+      class: 'ghost-btn',
+      text: '清除',
+      onclick: async () => {
+        await TB.api.bili.clearAuth();
+        biliInput.value = '';
+        biliInput.placeholder = '浏览器 F12 → Cookies → www.bilibili.com → SESSDATA';
+        biliAuthHint.textContent = '已清除：切到 B站 那一档会提示还没填 cookie';
+        resetBiliCell(false);
+      }
+    });
+
+    const biliStatus = TB.util.el('span', { class: 'field-hint', text: '正在问主进程…' });
+    const fillBiliStatus = (st) => {
+      if (st && st.ok === false) {
+        biliStatus.textContent = `上次失败：${st.error}`;
+        return;
+      }
+      biliStatus.textContent = !st?.set
+        ? '还没存 cookie：在浏览器里登录 B 站，按上面的路子复制 SESSDATA'
+        : !st.logged
+          ? 'cookie 存了，但还没问过 B 站——点右边「测一下」就知道有没有登录'
+          : `已登录：${st.uname || st.mid}`;
+    }
+    const resetBiliCell = (reload) => {
+      // 只动内存态；正在 B站 那一档才重问，停在本地时不该为一次设置保存发一趟请求
+      if (!TB.video) return;
+      TB.video.bili.loaded = false;
+      TB.video.bili.account = null;
+      TB.video.bili.rows = [];
+      if (reload && TB.video.source === 'bili') TB.video.loadBili(true);
+      else TB.video.repaint?.();
+    }
+    const biliTry = TB.util.el('button', {
+      class: 'ghost-btn',
+      text: '测一下',
+      onclick: async () => {
+        biliStatus.textContent = '正在问 B 站…';
+        const result = await TB.api.bili.check();
+        fillBiliStatus(result.ok ? await TB.api.bili.status() : result);
+        TB.app.toast(result.ok ? `已连上 B 站：${result.uname || result.mid}` : result.error, result.ok ? 'ok' : 'error');
+      }
+    });
+    TB.api.bili
+      .status()
+      .then(fillBiliStatus)
+      .catch((err) => (biliStatus.textContent = `问主进程失败：${err.message}`));
+
+    const biliCard = this.card(
+      'Bilibili（只读列表 · 播放交给浏览器）',
+      this.field('SESSDATA', TB.util.el('div', { class: 'inline' }, [biliInput, biliSaveAuth, biliClearAuth]), biliAuthHint),
+      this.field('连接状态', TB.util.el('div', { class: 'inline' }, [biliStatus, biliTry])),
+      this.field(
+        '这一格读什么',
+        TB.util.el('span', {
+          class: 'field-hint',
+          text: '「稍后再看 / 观看历史 / 我的收藏」三张单子（收藏点进夹子才列视频）。点一行是把 bilibili.com 那个页面交给系统浏览器——B 站的流是 DASH 分片 + 签名地址 + 必须回 Referer，<video> 吃不下，硬嵌进来只会做成一周好一周坏；会员内容那层 DRM 不碰。'
+        })
+      )
+    );
+    biliCard.dataset.card = 'bili';
+
     // ----- 组件与位置（layout.json 的常驻位置 + 当前面板） -----
     const visibleCount = TB.app.effectiveSlots().length;
-    const gridSummary = `${layout.grid.columns.length} 列 × ${layout.grid.rows.length} 行 · ${layout.pages.length} 个面板，当前「${TB.app.activePage()?.name || '—'}」`;
+    const pageGrid = TB.app.activeGrid();
+    const gridSummary = `${pageGrid.columns.length} 列 × ${pageGrid.rows.length} 行${TB.app.activePage()?.grid ? '（本面板自带骨架）' : ''} · ${layout.pages.length} 个面板，当前「${TB.app.activePage()?.name || '—'}」`;
 
     const screenCard = this.card(
       '屏幕目标',
@@ -338,7 +596,14 @@ TB.settings = {
         ]),
         '仅在“手动坐标”时生效'
       ),
-      this.field('窗口置顶', alwaysOnTop, '只有被其他窗口遮挡时才需要')
+      this.field('窗口置顶', alwaysOnTop, '只有被其他窗口遮挡时才需要'),
+      this.field(
+        '跟随虚拟桌面',
+        followVirtualDesktop,
+        '面板与虚拟桌面双向绑定：点了 layout.json 里绑了桌面的面板（生活/工作/游戏 = 第 1/2/3 个桌面）就切过去，'
+          + '反向也成立——他自己按 Win+Ctrl+←/→ 切桌面时面板跟着换。桌面不够 3 个时只在已有的里面切，不会替他新建。'
+          + '关掉则面板不再动桌面'
+      )
     );
 
     const refreshCard = this.card(
@@ -356,6 +621,33 @@ TB.settings = {
       this.field('含子目录', musicRecursive, '最深 4 层'),
       this.field('默认音量 %', musicVolume, '播放器上的音量优先'),
       this.field('歌词', TB.util.el('span', { class: 'field-hint', text: '与音频同名、同目录的 .lrc 自动同步' }))
+    );
+
+    const trainersCard = this.card(
+      '修改器',
+      this.field(
+        '文件夹',
+        TB.util.el('div', { class: 'inline' }, [trainersFolder, trainersBrowse]),
+        '扫顶层 .exe 和它下面一层子目录里的 .exe；改完保存后要点格子上的「重扫」'
+      )
+    );
+
+    const steamCard = this.card(
+      'Steam',
+      this.field(
+        '库文件夹',
+        TB.util.el('div', { class: 'inline' }, [steamFolder, steamBrowse]),
+        '读 steamapps 下的 appmanifest_*.acf；填 SteamLibrary 或它下面的 steamapps 都认。启动一律交给 Steam 客户端'
+      )
+    );
+
+    const reposCard = this.card(
+      '仓库根目录',
+      this.field(
+        '一行一个根目录',
+        TB.util.el('div', { class: 'inline' }, [reposRoots, reposBrowse]),
+        '每个根取它的**顶层文件夹**当一个项目；项目格和 git 格共用这一份。同一个目录在两个根里都出现只算一次，空行忽略。'
+      )
     );
 
     const moduleCard = TB.util.el('section', { class: 'card' }, [
@@ -387,7 +679,7 @@ TB.settings = {
       TB.util.el('div', { class: 'settings-grid' }, [
         screenCard,
         refreshCard,
-        TB.util.el('div', { class: 'card-col' }, [musicCard, aiCard, voiceCard, searchCard, moduleCard]),
+        TB.util.el('div', { class: 'card-col' }, [musicCard, trainersCard, steamCard, reposCard, aiCard, voiceCard, searchCard, mailCard, biliCard, moduleCard]),
         dockCard
       ]),
       TB.util.el('div', { class: 'settings-footer' }, [
@@ -406,6 +698,7 @@ TB.settings = {
               bounds: Object.fromEntries(Object.entries(boundsInputs).map(([key, input]) => [key, Number(input.value)]))
             };
             config.window.alwaysOnTop = alwaysOnTop.checked;
+            config.window.followVirtualDesktop = followVirtualDesktop.checked;
             config.metrics = { pollMs: Number(fastMs.value), slowPollMs: Number(slowMs.value), historySize: Number(historySize.value) };
             config.clipboard = { enabled: clipEnabled.checked, maxItems: Number(clipMax.value), pollMs: config.clipboard.pollMs };
             config.music = {
@@ -414,6 +707,10 @@ TB.settings = {
               volume: TB.util.clamp(Number(musicVolume.value) / 100, 0, 1),
               repeat: config.music.repeat
             };
+            config.trainers = { folder: trainersFolder.value.trim() };
+            config.steam = { folder: steamFolder.value.trim() };
+            // 去空行、按小写去重（Windows 路径不分大小写）、最多 12 条：再多这一格也摆不下
+            config.repos = { roots: uniqueRoots(reposRoots.value.split('\n')).slice(0, 12) };
             config.ai = {
               ...config.ai,
               model: aiModel.value,
@@ -447,6 +744,21 @@ TB.settings = {
               timeoutMs: Math.round(TB.util.clamp(Number(searchTimeout.value), 300, 10000)),
               autoStart: searchAutoStart.checked,
               sort: searchSort.value
+            };
+            // 授权码不在这里：它由「保存授权码」按钮即时加密落盘，跟着这个对象走就会进 git
+            config.mail = {
+              ...config.mail,
+              enabled: mailEnabled.checked,
+              account: mailAccount.value.trim(),
+              host: mailHost.value.trim(),
+              port: Math.round(TB.util.clamp(Number(mailPort.value), 1, 65535)),
+              mailbox: mailBox.value.trim() || 'INBOX',
+              maxMessages: Math.round(TB.util.clamp(Number(mailMax.value), 1, 200)),
+              pollMs: Math.round(TB.util.clamp(Number(mailPoll.value), 0, 3600000)),
+              timeoutMs: Math.round(TB.util.clamp(Number(mailTimeout.value), 3000, 60000)),
+              webmail: mailWeb.value.trim(),
+              notify: mailNotify.checked,
+              notifyVoice: mailNotifyVoice.checked
             };
             // dock 与 layout 分别由「快捷方式管理」「组件与位置」面板即时写入，
             // 这里不带着旧副本，避免覆盖那边的改动
