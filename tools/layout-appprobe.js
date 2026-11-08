@@ -292,14 +292,16 @@ async function main() {
           }
         }
       }
-      // 工作面板：左列两格合成 projzone 挂项目，中间第 2 列的两行（gauges 的左半 + 原 slot1）合成 gitzone 挂 git。
+      // 工作面板：左列两格合成 projzone 挂项目，中间第 2 列的两行（gauges 的左半 + 原 slot1）合成 gitzone 挂 git，
+      // 第 3 列的两行（gauges 的右半 + slot2）合成 officezone 挂办公文档。
       // 同样拿主界面那次测量当尺子：列宽、行高、行间距都是现量出来的，探针里不写死像素。
-      if (item.id === 'work' && a.clock && a.player && a.gauges && a.slot1) {
+      if (item.id === 'work' && a.clock && a.player && a.gauges && a.slot1 && a.slot2) {
         const near = (x, y) => Math.abs(x - y) <= 2;
         const gapY = a.player.y - (a.clock.y + a.clock.h);
         const wantH = a.clock.h + gapY + a.player.h;
         const p = shot.areas.projzone;
         const g = shot.areas.gitzone;
+        const o = shot.areas.officezone;
         if (!p) failures.push('工作面板没有 projzone 这一格');
         else {
           if (!near(p.x, a.clock.x) || !near(p.y, a.clock.y)) failures.push(`projzone 没从左列的左上角起笔：(${p.x},${p.y}) vs (${a.clock.x},${a.clock.y})`);
@@ -318,7 +320,23 @@ async function main() {
           if (p && !(near(p.h, g.h) && near(p.y, g.y) && near(p.y + p.h, g.y + g.h))) failures.push(`左右两块不齐：projzone ${JSON.stringify([p.y, p.h])} vs gitzone ${JSON.stringify([g.y, g.h])}`);
           if (p && g.x < p.x + p.w - 2) failures.push(`gitzone 不在 projzone 右边：${g.x} vs 左列右边 ${p.x + p.w}`);
         }
-        if (shot.areas.slot1) failures.push('工作面板还留着 slot1 这一格：它本该合进 gitzone');
+        if (!o) failures.push('工作面板没有 officezone 这一格');
+        else {
+          // officezone 吃第 3 列两行：左边缘对到主界面 slot2（gauges 的右半就在它上面），顶边对 gauges 那一行
+          if (!near(o.x, a.slot2.x) || !near(o.y, a.gauges.y)) failures.push(`officezone 没从第 3 列的左上角起笔：(${o.x},${o.y}) vs (${a.slot2.x},${a.gauges.y})`);
+          if (!near(o.w, a.slot2.w)) failures.push(`officezone 宽 ${o.w}，应是第 3 列 = ${a.slot2.w}`);
+          if (!near(o.h, wantH)) failures.push(`officezone 高 ${o.h}，应是两行 + 行间距 = ${wantH}（gauges 的右半 + slot2 没合成一整块）`);
+          if (o.module !== 'office') failures.push(`officezone 挂的是 "${o.module}"，工作面板第 3 列该放办公文档`);
+          if (g && !(near(g.h, o.h) && near(g.y, o.y) && near(g.y + g.h, o.y + o.h))) failures.push(`中间两块不齐：gitzone ${JSON.stringify([g.y, g.h])} vs officezone ${JSON.stringify([o.y, o.h])}`);
+          // 列与列之间本来就隔着一个列间距（左边那对量出来的 gapX 就是它），所以这里比的是
+          // 「相隔恰好一个列间距」，不是「右边缘等于左边缘」——写成 0 间距时真机那 9px gap 会把这条咬响
+          const gapX = p && g ? g.x - (p.x + p.w) : 0;
+          if (g && !(near(o.w, g.w) && near(o.x - (g.x + g.w), gapX))) failures.push(`officezone 和 gitzone 之间不是「一个列间距」：${JSON.stringify([g.x, g.w, o.x, o.w, gapX])}`);
+        }
+        // 合掉的三格不许再出现在外壳上：第 3 列现在是一整块，不再被行高切成上下两截
+        for (const at of ['slot1', 'gauges', 'slot2']) {
+          if (shot.areas[at]) failures.push(`工作面板还留着 "${at}" 这一格：slot1 该合进 gitzone，gauges 右半 + slot2 该合成 officezone`);
+        }
       }
       const lit = shot.tabs.find((tab) => tab.active);
       if (!lit || lit.page !== item.id) failures.push(`切到面板 "${item.id}" 后高亮停在 "${lit?.page}"`);

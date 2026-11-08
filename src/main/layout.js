@@ -15,7 +15,8 @@ const PAGE_AREAS = [
   { at: 'gamezone', label: '中部整块：游戏列表' },
   { at: 'leftzone', label: '左侧整块：原 clock+player 合并' },
   { at: 'projzone', label: '左侧整块：项目列表（原 clock+player 合并）' },
-  { at: 'gitzone', label: '中部整块：git 状态（原 slot1 + gauges 左半合并）' }
+  { at: 'gitzone', label: '中部整块：git 状态（原 slot1 + gauges 左半合并）' },
+  { at: 'officezone', label: '中列整块：办公文档（原 gauges 右半 + slot2 合并）' }
 ];
 
 const SHARED_AT = ['topbar', 'clipboard', 'dock'];
@@ -52,14 +53,15 @@ const LIFE_GRID = {
 
 // 工作面板自带的一份：左边两格（clock 在上、player 在下）合成 projzone 放项目列表，
 // 中间第 2 列那两格（gauges 的左半 + slot1）合成 gitzone 放 git 状态——左边点一行，右边就是那个仓库。
-// gauges 因此只占第 3 列第 2 行（它剩下的那一半），slot2 / workbench 照旧跟着全局。
+// 第 3 列那两格（gauges 的右半 + slot2）同样合成一格 officezone 放办公文档，于是这一列从上到下
+// 是一整块 572×402，不再被行高切成上下两截；右上那格 workbench 挂剪贴板历史（他点名的）。
 const WORK_GRID = {
   columns: GRID_COLUMNS,
   rows: GRID_ROWS,
   areas: [
     ['topbar', 'topbar', 'topbar', 'topbar'],
-    ['projzone', 'gitzone', 'gauges', 'workbench'],
-    ['projzone', 'gitzone', 'slot2', 'clipboard'],
+    ['projzone', 'gitzone', 'officezone', 'workbench'],
+    ['projzone', 'gitzone', 'officezone', 'clipboard'],
     ['dock', 'dock', 'dock', 'clipboard']
   ]
 };
@@ -78,7 +80,7 @@ function slotsOfGrid(grid, modules = {}) {
 const DEFAULT_PAGES = [
   { id: 'home', name: '主界面', modules: { clock: 'clock', player: 'player', gauges: 'gauges', workbench: 'workbench' } },
   { id: 'life', name: '生活面板', grid: LIFE_GRID, modules: { leftzone: 'mail', gauges: 'photos', slot1: 'player', slot2: 'video' }, desktop: 1 },
-  { id: 'work', name: '工作面板', desktop: 2, grid: WORK_GRID, modules: { projzone: 'projects', gitzone: 'git' } },
+  { id: 'work', name: '工作面板', desktop: 2, grid: WORK_GRID, modules: { projzone: 'projects', gitzone: 'git', officezone: 'office', workbench: 'clipboard' } },
   { id: 'game', name: '游戏面板', grid: GAME_GRID, modules: { gamezone: 'games' }, desktop: 3 }
 ];
 

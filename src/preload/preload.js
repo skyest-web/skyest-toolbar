@@ -132,6 +132,15 @@ contextBridge.exposeInMainWorld('deskToolbar', {
     pickFolder: () => invoke('repos:pickFolder')
   },
 
+  // 办公文档（工作面板第 3 列那一整块）：主进程扫 config.office.folder，行数据里的 path 只用于悬浮提示。
+  // open / reveal 只递 id——文档的绝对路径留在主进程这次的缓存里，这条路递不进去任何路径。
+  office: {
+    scan: (force) => invoke('office:scan', force),
+    open: (id) => invoke('office:open', id),
+    reveal: (id) => invoke('office:reveal', id),
+    pickFolder: () => invoke('office:pickFolder')
+  },
+
   // 邮箱（163 IMAP，只读）：行数据来自主进程那批缓存，渲染层拿不到任何凭据；
   // 授权码只进不出——setAuth 之后也只能看到 hint。
   // 提醒只送「几条、谁」：payload 里没有主题、没有正文，更没有授权码。

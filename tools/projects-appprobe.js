@@ -258,8 +258,8 @@ async function main() {
     const secOf = (slot) => document.querySelector('#shell > section[data-slot="' + slot + '"]');
     return JSON.stringify({
       workProjects: at('work', 'projzone'),
-      // 左列合成一整块以后，工作面板剩下的位置是 gitzone / gauges / workbench / slot2；slot1 和 player 都被合掉了
-      workOthers: ['gitzone', 'gauges', 'workbench', 'slot2'].map((slot) => at('work', slot)),
+      // 左列合成一整块以后，工作面板剩下的位置是 gitzone / officezone / workbench；slot1、player、gauges、slot2 都被合掉了
+      workOthers: ['gitzone', 'officezone', 'workbench'].map((slot) => at('work', slot)),
       workSlots: TB.app.pages().find((p) => p.id === 'work')?.slots.map((s) => s.at).join(',') || null,
       homePlayer: at('home', 'player'),
       lifeSlot1: at('life', 'slot1'),
@@ -268,10 +268,10 @@ async function main() {
       pages: TB.app.pages().map((p) => p.id)
     });
   })()`));
-  console.log(`其余面板：work 那四格 ${others.workOthers.join(',')} / home player=${others.homePlayer} / life slot1=${others.lifeSlot1} / game gamezone=${others.gameZone} / 常驻 ${others.shared.join(',')}`);
+  console.log(`其余面板：work 那三格 ${others.workOthers.join(',')} / home player=${others.homePlayer} / life slot1=${others.lifeSlot1} / game gamezone=${others.gameZone} / 常驻 ${others.shared.join(',')}`);
   if (others.workProjects !== 'projects') failures.push(`内存里工作面板 projzone 是 "${others.workProjects}"`);
-  if (others.workSlots !== 'projzone,gitzone,gauges,workbench,slot2') failures.push(`工作面板的格子清单是 "${others.workSlots}"，应为 projzone,gitzone,gauges,workbench,slot2`);
-  if (others.workOthers.join(',') !== 'git,placeholder,placeholder,placeholder') failures.push(`工作面板别的位置被顺手改了：${others.workOthers.join(',')}`);
+  if (others.workSlots !== 'projzone,gitzone,officezone,workbench') failures.push(`工作面板的格子清单是 "${others.workSlots}"，应为 projzone,gitzone,officezone,workbench`);
+  if (others.workOthers.join(',') !== 'git,office,clipboard') failures.push(`工作面板别的位置被顺手改了：${others.workOthers.join(',')}`);
   if (others.homePlayer !== 'player') failures.push(`主界面的音乐播放器那格被动了：${others.homePlayer}`);
   if (others.lifeSlot1 !== 'player') failures.push(`生活面板的音乐那格被动了：${others.lifeSlot1}`);
   if (others.gameZone !== 'games') failures.push(`游戏面板的游戏列表那格被动了：${others.gameZone}`);

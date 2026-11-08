@@ -5,7 +5,8 @@
 // 2) 自带 grid 的面板行列数必须和全局一致，而且常驻位置（顶栏/右侧竖条/底部通栏）一个都不能少，
 //    少了切过去就"顶栏没了"；
 // 3) normalize 要能补齐只写 areas 的 grid、要幂等、要把老 v1 文件（顶层 slots、没有 pages）吃掉；
-// 4) 引用的位置名不在自己 grid 里（比如还留着旧的 slot1）必须报错，而不是渲染出一块空白。
+// 4) 引用的位置名不在自己 grid 里（比如还留着旧的 slot1）必须报错，而不是渲染出一块空白；
+// 5) 磁盘上那份 layout.json 现读现验（手工改歪时 load() 会整份退回默认，画面「看起来什么都没变」）。
 //
 // 用法（Git Bash）: node tools/layout-check.js
 const { normalize, validate, DEFAULT_LAYOUT, effectiveSlots, desktopOfPage, pageOfDesktop } = require('../src/main/layout');
@@ -52,14 +53,17 @@ const lifeMiddle = life.grid.areas.slice(1, 3).map((row) => row.slice(1, 3).join
 const baseMiddle = DEFAULT_LAYOUT.grid.areas.slice(1, 3).map((row) => row.slice(1, 3).join(' '));
 expect(`生活面板中间三格被改动了：${JSON.stringify(lifeMiddle)} ≠ ${JSON.stringify(baseMiddle)}`, JSON.stringify(lifeMiddle) === JSON.stringify(baseMiddle));
 
-// ---------- 工作面板自带的那份 grid：左列合成 projzone，中间第 2 列合成 gitzone ----------
+// ---------- 工作面板自带的那份 grid：左列合成 projzone，中间两列各合成 gitzone / officezone ----------
 const work = DEFAULT_LAYOUT.pages.find((page) => page.id === 'work');
 expect('工作面板没带自己的 grid', Boolean(work.grid));
 const workNames = new Set(work.grid.areas.flat().filter((token) => !['topbar', 'clipboard', 'dock'].includes(token)));
-expect(`工作面板 grid 里的本页位置有 ${workNames.size} 个（该是 5 个）`, workNames.size === 5);
-expect(`工作面板的格子清单是 "${slotNames(work)}"`, slotNames(work) === 'projzone,gitzone,gauges,workbench,slot2');
+expect(`工作面板 grid 里的本页位置有 ${workNames.size} 个（该是 4 个）`, workNames.size === 4);
+expect(`工作面板的格子清单是 "${slotNames(work)}"`, slotNames(work) === 'projzone,gitzone,officezone,workbench');
 expect('工作面板 projzone 该挂 projects', work.slots.find((slot) => slot.at === 'projzone').module === 'projects');
 expect('工作面板 gitzone 该挂 git', work.slots.find((slot) => slot.at === 'gitzone').module === 'git');
+expect('工作面板 officezone 该挂 office', work.slots.find((slot) => slot.at === 'officezone').module === 'office');
+expect(`工作面板 workbench 该挂 clipboard（剪贴板历史），实际是 "${work.slots.find((slot) => slot.at === 'workbench').module}"`,
+  work.slots.find((slot) => slot.at === 'workbench').module === 'clipboard');
 expect('工作面板每个格子都该有中文名', work.slots.every((slot) => slot.label));
 // 左边那一大块：第 2、3 行的第 1 列全是 projzone（原 clock + player）
 const workLeft = work.grid.areas.slice(1, 3).map((row) => row[0]);
@@ -67,11 +71,38 @@ expect(`projzone 该铺满左列两行，实际是 ${JSON.stringify(workLeft)}`,
 // 中间那一大块：第 2、3 行的第 2 列全是 gitzone——这就是「slot1 + gauges 的左半」合成一格的写法
 const workMid = work.grid.areas.slice(1, 3).map((row) => row[1]);
 expect(`gitzone 该铺满第 2 列两行，实际是 ${JSON.stringify(workMid)}`, workMid.every((token) => token === 'gitzone'));
-// gauges 因此只剩第 3 列那一半；第 4 列（workbench / clipboard）必须和全局逐字一样，常驻位不能被合掉
-expect('工作面板 gauges 不该还占着第 2 列', work.grid.areas[1][2] === 'gauges' && work.grid.areas[2][2] === 'slot2');
+// 第 3 列同理：gauges 的右半 + slot2 合成一整块 officezone，两行都得是它，不能再被行高切成上下两截
+const workOffice = work.grid.areas.slice(1, 3).map((row) => row[2]);
+expect(`officezone 该铺满第 3 列两行，实际是 ${JSON.stringify(workOffice)}`, workOffice.every((token) => token === 'officezone'));
+// 第 4 列（workbench / clipboard）必须和全局逐字一样，常驻位不能被合掉
 const workRight = work.grid.areas.slice(1, 3).map((row) => row[3]);
 const baseRight = DEFAULT_LAYOUT.grid.areas.slice(1, 3).map((row) => row[3]);
 expect(`工作面板第 4 列被改动了：${JSON.stringify(workRight)} ≠ ${JSON.stringify(baseRight)}`, JSON.stringify(workRight) === JSON.stringify(baseRight));
+
+// ---------- 磁盘上那份 layout.json（跟着 git 走的那份才是权威） ----------
+// 上面各段喂的都是 DEFAULT_LAYOUT 这个内存对象；真正的风险是有人手工编辑磁盘那份、
+// 把 areas 和 slots 写歪了。load() 校验不过会**整份退回默认布局**，症状是「改了个合并格，
+// 画面看起来什么都没变」——所以这里必须现读现验一遍，光验内存那份是自证。
+const fs = require('node:fs');
+const path = require('node:path');
+const layoutStore = require('../src/main/layout');
+const APP_ROOT = path.resolve(__dirname, '..');
+expect('仓库里根本没有 layout.json（落位全靠它）', fs.existsSync(path.join(APP_ROOT, 'layout.json')));
+const disk = layoutStore.load(APP_ROOT);
+expect(`磁盘那份读进来过不了校验：${layoutStore.validate(structuredClone(disk)).join(' / ')}`, layoutStore.validate(structuredClone(disk)).length === 0);
+const diskWork = disk.pages.find((page) => page.id === 'work');
+expect(`磁盘那份工作面板格子清单是 "${diskWork.slots.map((slot) => slot.at).join(',')}"，应为 projzone,gitzone,officezone,workbench`,
+  diskWork.slots.map((slot) => slot.at).join(',') === 'projzone,gitzone,officezone,workbench');
+expect(`磁盘那份 officezone 没挂 office：${diskWork.slots.find((slot) => slot.at === 'officezone')?.module}`,
+  diskWork.slots.find((slot) => slot.at === 'officezone')?.module === 'office');
+expect(`磁盘那份 workbench 没挂 clipboard：${diskWork.slots.find((slot) => slot.at === 'workbench')?.module}`,
+  diskWork.slots.find((slot) => slot.at === 'workbench')?.module === 'clipboard');
+const diskOffice = diskWork.grid.areas.slice(1, 3).map((row) => row[2]);
+expect(`磁盘那份的第 3 列两行不是同一块：${JSON.stringify(diskOffice)}（areas 写歪一格，validate 就该拒，而不是静默退回默认）`,
+  diskOffice.every((token) => token === 'officezone'));
+// 合掉的格子不许在 areas 里露面：露面了 slots 就少一格，load() 会整份退回默认
+expect(`磁盘那份工作面板的 areas 里还留着被合掉的位置：${JSON.stringify(diskWork.grid.areas.flat())}`,
+  !['slot1', 'slot2', 'gauges', 'clock', 'player'].some((token) => diskWork.grid.areas.flat().includes(token)));
 
 // ---------- 没自带 grid 的面板仍跟全局骨架走 ----------
 for (const page of DEFAULT_LAYOUT.pages.filter((item) => !item.grid)) {
@@ -182,4 +213,4 @@ if (failures.length) {
   process.exitCode = 1;
   return;
 }
-console.log(`✓ 布局自检全绿：游戏面板自带 grid（中间 2×2 合成 gamezone、4 个位置）、生活面板自带 grid（左列 2 行合成 leftzone 挂 mail、中间三格与全局逐字一样）、其余面板仍用全局骨架、行列不一致/丢常驻位/残留旧位置名都能报错、normalize 幂等、v1 老文件吃得下`);
+console.log(`✓ 布局自检全绿：游戏面板自带 grid（中间 2×2 合成 gamezone、4 个位置）、生活面板自带 grid（左列 2 行合成 leftzone 挂 mail、中间三格与全局逐字一样）、工作面板自带 grid（左列 projzone / 中列 gitzone / 第 3 列 officezone 各吃两行，4 个位置）、磁盘那份 layout.json 现读现过校验（工作面板四格、第 3 列两行同一块、合掉的位置没在 areas 里露面）、其余面板仍用全局骨架、行列不一致/丢常驻位/残留旧位置名都能报错、normalize 幂等、v1 老文件吃得下`);

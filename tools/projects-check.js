@@ -400,18 +400,20 @@ async function main() {
   expect('读不懂的 reflog 该回 null（让上层退回目录 mtime）', reflogTime(garbage) === null);
 
   // ---------- 10. 落位：只有工作面板左边那一整块动了 ----------
-  // 左列两格合成一整块 projzone（这一格），中间合成 gitzone（项目格的第二个视图，该挂什么由 git:check 钉）；
-  // 这一条继续守的是「别顺手把没点名的格子也改了」，所以名单里只有剩下那三格。
+  // 左列两格合成一整块 projzone（这一格），中间合成 gitzone（项目格的第二个视图，该挂什么由 git:check 钉），
+  // 第 3 列合成 officezone（该挂什么由 office:check 钉）；
+  // 这一条继续守的是「别顺手把没点名的格子也改了」；workbench 后来被他点名挂剪贴板历史，所以期望值是 clipboard。
   const onDisk = layoutStore.load(APP_ROOT);
   const moduleAt = (layout, pageId, at) => layout.pages.find((page) => page.id === pageId)?.slots.find((slot) => slot.at === at)?.module;
   for (const [where, layout] of Object.entries({ 'layout.json': onDisk, DEFAULT_PAGES: layoutStore.DEFAULT_LAYOUT })) {
     expect(`${where}：工作面板 projzone 格挂的是 "${moduleAt(layout, 'work', 'projzone')}"，应为 "projects"`, moduleAt(layout, 'work', 'projzone') === 'projects');
-    for (const at of ['gauges', 'workbench', 'slot2']) {
-      expect(`${where}：工作面板「${at}」被顺手改成了 "${moduleAt(layout, 'work', at)}"（他点名的只有 projzone 和 gitzone 两块）`, moduleAt(layout, 'work', at) === 'placeholder');
+    for (const at of ['workbench']) {
+      expect(`${where}：工作面板「${at}」被顺手改成了 "${moduleAt(layout, 'work', at)}"（他点名的是 projzone / gitzone 两块加 workbench 的剪贴板）`, moduleAt(layout, 'work', at) === 'clipboard');
     }
     // 合掉的那几格不许以别的名字回来：左列和中间各是一整块，多一格就是布局没改对
-    for (const at of ['player', 'clock', 'slot1']) {
-      expect(`${where}：工作面板又冒出了「${at}」这一格（左列/中间各只该有一整块）`, moduleAt(layout, 'work', at) === undefined);
+    // gauges / slot2 现在是第 3 列那一整块（officezone）的两半，本身也不再是工作面板的位置
+    for (const at of ['player', 'clock', 'slot1', 'gauges', 'slot2']) {
+      expect(`${where}：工作面板又冒出了「${at}」这一格（左列/中间/第 3 列各只该有一整块）`, moduleAt(layout, 'work', at) === undefined);
     }
     expect(`${where}：主界面 player 格（音乐播放器）被动了：${moduleAt(layout, 'home', 'player')}`, moduleAt(layout, 'home', 'player') === 'player');
     expect(`${where}：生活面板 slot1 的音乐被动了：${moduleAt(layout, 'life', 'slot1')}`, moduleAt(layout, 'life', 'slot1') === 'player');
@@ -541,7 +543,7 @@ main()
     console.log('  上次动过（git reflog 优先、没有才退回目录 mtime、四种读不到的样子）、倒序、');
     console.log('  行里没有 exe 路径但留着项目路径、只认 id、4 秒防抖、spawn 两条失败来路都接住、');
     console.log('  多个根：去重去空行、一个坏根只进 warnings 不掀表、全坏才报错、空 roots 说「没配置」、「不传才兜回 DEFAULT_ROOT」、');
-    console.log('  Toolbox 四层路径认得到、落位只动工作面板 projzone（gitzone 归 git 格，其余三格没动，合掉的三格没回来）、');
+    console.log('  Toolbox 四层路径认得到、落位只动工作面板点名的格子（gitzone 归 git 格、officezone 归 office 格、workbench 归剪贴板，合掉的五格没回来）、');
     console.log('  手势：左键选中 / 双击交给 IDE / Ctrl+左键打开文件夹、选中态只在 TB.app.state.project 一份、');
     console.log('  preload 三条通道 + repos.pickFolder 都打到 handler 并带上参数、');
     console.log('  repos.roots 存盘再读回还在（DEFAULTS 和 save 白名单两处都在）、设置卡片真的写这一段');

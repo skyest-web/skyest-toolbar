@@ -744,12 +744,13 @@ function service(rows, table, opts = {}) {
     for (const [where, layout] of Object.entries({ 'layout.json': onDisk, DEFAULT_PAGES: layoutStore.DEFAULT_LAYOUT })) {
       expect(`${where}：工作面板 gitzone 格挂的是 "${moduleAt(layout, 'work', 'gitzone')}"，应为 "git"`, moduleAt(layout, 'work', 'gitzone') === 'git');
       expect(`${where}：工作面板 projzone 格挂的是 "${moduleAt(layout, 'work', 'projzone')}"，应为 "projects"`, moduleAt(layout, 'work', 'projzone') === 'projects');
-      for (const at of ['gauges', 'workbench', 'slot2']) {
-        expect(`${where}：工作面板「${at}」被顺手改成了 "${moduleAt(layout, 'work', at)}"`, moduleAt(layout, 'work', at) === 'placeholder');
+      for (const at of ['workbench']) {
+        expect(`${where}：工作面板「${at}」被顺手改成了 "${moduleAt(layout, 'work', at)}"（他点名挂剪贴板历史）`, moduleAt(layout, 'work', at) === 'clipboard');
       }
-      // 合出来的两块是同一格的两半：谁再顺手加回 slot1 / player，这两条先红
-      for (const at of ['slot1', 'player', 'clock']) {
-        expect(`${where}：工作面板多出了「${at}」这一格（左列和中间已经各合成一整块了）`, moduleAt(layout, 'work', at) === undefined);
+      // 合出来的三块（projzone / gitzone / officezone）各是一整列的两半：谁再顺手加回 slot1 / player，
+      // 或把 gauges、slot2 这两半重新拆出来当独立格子，这两条先红。officezone 该挂什么由 office:check 钉。
+      for (const at of ['slot1', 'player', 'clock', 'gauges', 'slot2']) {
+        expect(`${where}：工作面板多出了「${at}」这一格（左列/中间/第 3 列已经各合成一整块了）`, moduleAt(layout, 'work', at) === undefined);
       }
       expect(`${where}：主界面的时钟被换掉了：${moduleAt(layout, 'home', 'clock')}`, moduleAt(layout, 'home', 'clock') === 'clock');
       expect(`${where}：生活面板的邮箱被换掉了：${moduleAt(layout, 'life', 'leftzone')}`, moduleAt(layout, 'life', 'leftzone') === 'mail');
@@ -932,7 +933,7 @@ function service(rows, table, opts = {}) {
     console.log('    七种情况在闸前拒（游离/冲突/说明空或超长/只有未跟踪/没上游/领先0/尚无提交）、');
     console.log('    确认条四句话分开说已跟踪与未跟踪、失败翻译用实测原话且不漏盘符。');
     console.log('  契约：id 与项目格同一批、点文件找回的是项目格判的 IDE、路径落 spawn 前 projects 再核一遍、');
-    console.log('    两份落位都是 work/projzone=projects + work/gitzone=git 且 slot1|player|clock 再没回来、preload 五条通道 + main 五个 handler、');
+    console.log('    两份落位都是 work/projzone=projects + work/gitzone=git 且 slot1|player|clock|gauges|slot2 再没回来、preload 五条通道 + main 五个 handler、');
     console.log('    status 那条把选中 id 一路带到 refresh、组件没选中不发 IPC、need=stale 自己清选中并重扫项目格、');
     console.log('    三态齐（.gt-prompt / repoBlock / infoCard+rootsList）、卡上路径只抄 TB.app.state.project、');
     console.log('    项目格左键选中 + 双击启动 + Ctrl 打开文件夹、组件只递 id/序号/说明、config 里若要加 git 段则 DEFAULTS 与白名单必须同时有。');

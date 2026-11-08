@@ -134,6 +134,11 @@
       "D:\\GitProject"
     ]
   },
+  "office": {
+    "folder": "D:\\OneDrive\\办公",
+    "recursive": true,
+    "limit": 300
+  },
   "ai": {
     "model": "deepseek-chat",
     "systemPrompt": "你是常驻在桌面工具栏里的助手，回答尽量简短。",

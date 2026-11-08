@@ -170,12 +170,12 @@ for (const [where, page] of Object.entries({ DEFAULT_PAGES: lifeOf(layoutStore.D
   expect(`${where}：生活面板中间那块被改动了（${middle}），中间两行本该跟全局逐字一样`, middle === JSON.stringify([['gauges', 'gauges'], ['slot1', 'slot2']]));
 }
 expect(`改完落位后 layout.json 过不了校验：${layoutStore.validate(onDisk).join(' / ')}`, layoutStore.validate(onDisk).length === 0);
-// 他点名的只有生活面板那一格：主界面那张 gauges 还是系统指标，工作面板照旧空着
+// 他点名的只有生活面板那一格：主界面那张 gauges 还是系统指标，工作面板那一列已经合成整块、根本没有 gauges 这一格
 for (const [where, page] of Object.entries(homePages)) {
   expect(`${where}：主界面 gauges 被顺手改成了 "${moduleAt(page, 'gauges')}"（他点名的只有生活面板那一格）`, moduleAt(page, 'gauges') === 'gauges');
 }
-expect(`工作面板 gauges 被顺手改成了 "${moduleAt(onDisk.pages.find((page) => page.id === 'work'), 'gauges')}"`,
-  moduleAt(onDisk.pages.find((page) => page.id === 'work'), 'gauges') === 'placeholder');
+const workSlotsOf = (layout) => (layout.pages.find((page) => page.id === 'work')?.slots || []).map((slot) => slot.at).join(',');
+expect(`工作面板的格子清单是 "${workSlotsOf(onDisk)}"，gauges / slot2 该已经合成第 3 列那一整块了`, !workSlotsOf(onDisk).includes('gauges'));
 expect(`游戏面板 gauges 这一格本不该存在，却被写进了 "${JSON.stringify(lifeOf(layoutStore.DEFAULT_LAYOUT).grid.areas)}"`,
   !JSON.stringify(onDisk.pages.find((page) => page.id === 'game').grid.areas).includes('gauges'));
 
@@ -288,5 +288,5 @@ if (failures.length) {
 }
 console.log(`✓ 相册格子自检全绿：四种「没东西可看」的说法各自对上、只收 jpg/jpeg/png/webp/avif/gif/bmp（.heic/.svg/.tiff 都挡住）、` +
   `file:/// 把空格与 # 编得对且能原样解回路径；递归与深度上限与 node_modules/.git/$Recycle.Bin 跳过都对、limit 生效、按修改时间倒序、相机名不剥；` +
-  `真扫 samples/ 的 ${pngs.length} 个 png 全在且没混进日志音频；生活面板 leftzone=邮箱 / gauges=相册 / slot1=音乐 / slot2=视频，两份一致且过校验、主界面与工作面板没被顺手改；` +
+  `真扫 samples/ 的 ${pngs.length} 个 png 全在且没混进日志音频；生活面板 leftzone=邮箱 / gauges=相册 / slot1=音乐 / slot2=视频，两份一致且过校验、主界面 gauges 还是系统指标且工作面板没有 gauges 这一格；` +
   `preload 只有 scan / pickFolder 两条通道且都打到对应 handler、main.js 没有 photos:save、CSP 的 img-src 仍放 file:、config 的 DEFAULTS 和 save 白名单都带 photos 段`);

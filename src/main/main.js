@@ -25,6 +25,7 @@ const { Steam } = require('./services/steam');
 const { Library } = require('./services/library');
 const { Projects } = require('./services/projects');
 const { Git } = require('./services/git');
+const { Office } = require('./services/office');
 const { Mail } = require('./services/mail');
 const { Bili } = require('./services/bili');
 const { VdesktopFollow } = require('./services/vdesktop-follow');
@@ -58,6 +59,7 @@ let steam = null;
 let library = null;
 let projects = null;
 let git = null;
+let office = null;
 let mail = null;
 let bili = null;
 let placement = null;
@@ -512,6 +514,23 @@ function registerIpc() {
     return filePaths[0];
   });
 
+  // 办公文档（工作面板第 3 列那一整块）：和 projects / trainers 同一条规矩——
+  // 列表由主进程扫（文件夹只从 config.office 读），打开 / 定位只认这次缓存里的 id，渲染层递不进路径。
+  ipcMain.handle('office:scan', (_event, force) => office.scan(Boolean(force)));
+  ipcMain.handle('office:open', async (_event, id) => office.open(id));
+  ipcMain.handle('office:reveal', (_event, id) => office.reveal(id));
+  ipcMain.handle('office:pickFolder', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: '选择办公文档文件夹',
+      defaultPath: config.office.folder || undefined,
+      properties: ['openDirectory']
+    });
+    if (canceled || !filePaths.length) return null;
+    config = configStore.merge(config, { office: { ...config.office, folder: filePaths[0] } });
+    configStore.save(APP_ROOT, config);
+    return filePaths[0];
+  });
+
   // 邮箱：只读取件箱头部。授权码即时加密写进 userData/mail-auth.bin，不跟随「保存并应用」，
   // 也永不跨 IPC 回传——mail:status 里只有 set/hint（位数 + 尾两字）。
   ipcMain.handle('mail:status', () => mail.status());
@@ -717,6 +736,10 @@ if (!gotLock) {
     // 给的是 projects **服务本身**而不是某一行的快照——「git 格是项目格的第二个视图」要在代码里成立，
     // 两格共用同一批行、同一套 id，点了改动文件才能找回项目格判出来的那个 IDE。
     git = new Git({ getProjects: () => projects });
+
+    // 办公文档（工作面板第 3 列那一整块）：不常驻、不预扫，组件第一次要列表才扫目录。
+    // 文件夹只从 config.office 读；点开走系统默认程序（shell.openPath），主进程不猜哪个软件该起来。
+    office = new Office({ getConfig: () => config });
 
     // 邮箱（163 IMAP，只读头部）：不预连、不预拉，组件第一次要数据才握手。
     // 授权码跟着 userData 走，所以这里只给目录，不传值。

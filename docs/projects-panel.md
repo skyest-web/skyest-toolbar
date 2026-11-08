@@ -1,6 +1,6 @@
 # 项目列表（工作面板左边那一整块 projzone）
 
-工作面板（`work`，绑第 2 个虚拟桌面）左边一整块是 `projzone`，挂 `projects`：把设置里「仓库根目录」那一栏列的每个根（默认就一个 `D:\GitProject`）底下的**顶层文件夹**逐个列出来，一行一个项目，左边名字、中间该用哪个 IDE、右边「多久没动过」。三种手势各管一件事——**左键选中、双击交给 IDE、Ctrl+左键打开文件夹**。中间那一整块 `gitzone` 是它的第二个视图（见 [docs/git-panel.md](git-panel.md)）：左边点中哪一行，右边就看那一个仓库；点的是非仓库文件夹，右边出项目信息卡。其余两格（`gauges` 剩下的那一半 / `slot2`）和 `workbench`、`dock` 那些照旧，别的面板一格没动。
+工作面板（`work`，绑第 2 个虚拟桌面）左边一整块是 `projzone`，挂 `projects`：把设置里「仓库根目录」那一栏列的每个根（默认就一个 `D:\GitProject`）底下的**顶层文件夹**逐个列出来，一行一个项目，左边名字、中间该用哪个 IDE、右边「多久没动过」。三种手势各管一件事——**左键选中、双击交给 IDE、Ctrl+左键打开文件夹**。中间那一整块 `gitzone` 是它的第二个视图（见 [docs/git-panel.md](git-panel.md)）：左边点中哪一行，右边就看那一个仓库；点的是非仓库文件夹，右边出项目信息卡。第 3 列那一整块是 `officezone` 放办公文档（见 [docs/office-panel.md](office-panel.md)），`workbench`、`dock`、`clipboard` 那些照旧，别的面板一格没动。
 
 这一格只做「列出来 + 选中 + 交出去」：
 
@@ -43,9 +43,9 @@
 
 ## 2. 落位：工作面板自带一份 grid，左列两行合成 projzone
 
-这一格不再占单格。工作面板带了自己的 `grid`（`src/main/layout.js:56` 的 `WORK_GRID`）：左列第 2、3 行（原来 `clock` 在上、`player` 在下）合成一整块 `projzone` 放项目列表，第 2 列那两行（`gauges` 的左半 + `slot1`）合成 `gitzone` 放 git；`gauges` 因此只占第 3 列第 2 行。本机量到 `projzone` 330×402、`gitzone` 572×402，两格同顶同底。
+这一格不再占单格。工作面板带了自己的 `grid`（`src/main/layout.js:58` 的 `WORK_GRID`）：左列第 2、3 行（原来 `clock` 在上、`player` 在下）合成一整块 `projzone` 放项目列表，第 2 列那两行（`gauges` 的左半 + `slot1`）合成 `gitzone` 放 git，第 3 列那两行（`gauges` 的右半 + `slot2`）合成 `officezone` 放办公文档。本机量到 `projzone` 330×402、`gitzone` 572×402、`officezone` 572×402，三块同顶同底。
 
-和相册/邮箱/游戏列表那几块一样，落位要改两处且必须**逐字一致**：磁盘上的 `layout.json:182`–`:258`（那一页的 `grid` + 五条 `slots`，权威）和 `layout.js:81` 的 `modules: { projzone: 'projects', gitzone: 'git' }`（兜底）。**只改磁盘那份咬不住**：`layoutStore.load()` 校验不过就整份退回 `DEFAULT_LAYOUT`，所以自检两份都钉。`projects-check.js` 最后一段钉这两份，并反向钉「没顺手改别人」：主界面/生活/游戏三块面板一格没动，工作面板除 `projzone` / `gitzone` 之外那三格（`gauges` / `workbench` / `slot2`）还是 `placeholder`，`work.desktop` 还是 2。`validate()` 那三条硬规矩（行列数等于全局、常驻位仍在 `areas` 里、`slots` 只引用本页 `areas` 里的名字）一条都没碰——旧的 `clock` / `player` / `slot1` 必须一并从工作面板的 `slots` 里删掉，留着会让整份退回默认。
+和相册/邮箱/游戏列表那几块一样，落位要改两处且必须**逐字一致**：磁盘上的 `layout.json:183`–`:251`（那一页的 `grid` + 四条 `slots`，权威）和 `layout.js:83` 的 `modules: { projzone: 'projects', gitzone: 'git', officezone: 'office', workbench: 'clipboard' }`（兜底）。**只改磁盘那份咬不住**：`layoutStore.load()` 校验不过就整份退回 `DEFAULT_LAYOUT`，所以自检两份都钉。`projects-check.js` 最后一段钉这两份，并反向钉「没顺手改别人」：主界面/生活/游戏三块面板一格没动，工作面板除了这三块只剩 `workbench` 挂剪贴板历史（`clipboard`），`work.desktop` 还是 2。`validate()` 那三条硬规矩（行列数等于全局、常驻位仍在 `areas` 里、`slots` 只引用本页 `areas` 里的名字）一条都没碰——旧的 `clock` / `player` / `slot1` / `gauges` / `slot2` 必须一并从工作面板的 `slots` 里删掉，留着会让整份退回默认。
 
 ### 2.1 根目录这一栏：从写死到 `repos.roots`
 
@@ -139,7 +139,7 @@ unset ELECTRON_RUN_AS_NODE && ./node_modules/electron/dist/electron.exe . --remo
 npm run projects:appprobe -- 9223 --shot   # 存 samples/projects-panel.png
 ```
 
-`projects:appprobe` 起手先看 `TB.api.projects` 在不在——不在说明跑的是改动之前的旧主进程，直接停（改主进程/preload 必须重启应用，光 reload 渲染层不够；只改渲染层可以 `location.reload()` 再跑）。它还会先查返回的列表里有没有 `roots` 数组：没有说明跑的是改动之前的旧主进程（旧版只回一个字符串根），当场停而不是让后面的断言一句句假红。格子找的是 `data-slot="projzone"`（**不是** `player` 了），并且顺带钉工作面板的格子清单是 `projzone,gitzone,gauges,workbench,slot2` 这五格、别的面板一格没动（home 的 `player` 还是音乐、life 的 `slot1` 还是音乐）；几何那一段在 `layout-appprobe` 里量。截图那张是**真目录**：6 个项目、三个 IDE 都认到了，`toolbar / WebStorm / 2 天前` 在第一行。工作面板绑桌面 2，点那一页 tab 会把虚拟桌面跳过去，所以探针在点之前先记下他原来在哪一页，收尾切回去（切完再读一次 `TB.app.state.page` 确认，别把桌面丢在第二个上；tab 节点会被上一趟切换留下的外壳重建换掉，所以点完要复查、不对就再点一次）。
+`projects:appprobe` 起手先看 `TB.api.projects` 在不在——不在说明跑的是改动之前的旧主进程，直接停（改主进程/preload 必须重启应用，光 reload 渲染层不够；只改渲染层可以 `location.reload()` 再跑）。它还会先查返回的列表里有没有 `roots` 数组：没有说明跑的是改动之前的旧主进程（旧版只回一个字符串根），当场停而不是让后面的断言一句句假红。格子找的是 `data-slot="projzone"`（**不是** `player` 了），并且顺带钉工作面板的格子清单是 `projzone,gitzone,officezone,workbench` 这格、别的面板一格没动（home 的 `player` 还是音乐、life 的 `slot1` 还是音乐）；几何那一段在 `layout-appprobe` 里量。截图那张是**真目录**：6 个项目、三个 IDE 都认到了，`toolbar / WebStorm / 2 天前` 在第一行。工作面板绑桌面 2，点那一页 tab 会把虚拟桌面跳过去，所以探针在点之前先记下他原来在哪一页，收尾切回去（切完再读一次 `TB.app.state.page` 确认，别把桌面丢在第二个上；tab 节点会被上一趟切换留下的外壳重建换掉，所以点完要复查、不对就再点一次）。
 
 判绿之前先做变异（QODER.md 那条老规矩）：
 

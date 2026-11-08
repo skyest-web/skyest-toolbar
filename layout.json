@@ -206,13 +206,13 @@
           [
             "projzone",
             "gitzone",
-            "gauges",
+            "officezone",
             "workbench"
           ],
           [
             "projzone",
             "gitzone",
-            "slot2",
+            "officezone",
             "clipboard"
           ],
           [
@@ -237,21 +237,15 @@
           "enabled": true
         },
         {
-          "at": "gauges",
-          "label": "中部上：系统指标（固定高度）",
-          "module": "placeholder",
+          "at": "officezone",
+          "label": "中列整块：办公文档（原 gauges 右半 + slot2 合并）",
+          "module": "office",
           "enabled": true
         },
         {
           "at": "workbench",
           "label": "右上",
-          "module": "placeholder",
-          "enabled": true
-        },
-        {
-          "at": "slot2",
-          "label": "中下右：占位",
-          "module": "placeholder",
+          "module": "clipboard",
           "enabled": true
         }
       ]

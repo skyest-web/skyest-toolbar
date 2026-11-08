@@ -272,10 +272,13 @@ async function main() {
     window.__photosDry = { real, calls };
     TB.photos.folder = null;
     TB.photos.opened = -1;
+    // 旧的 216 张得先倒掉：rescan() 是 await 完才写 items，而下面那句等的正是 items.length——
+    // 不清就是拿着上一批（他真文件夹那 216 张 jpg）当这次的结果比对，报错还都在下一行的 DOM 上
+    TB.photos.items = [];
     TB.app.state.config.photos = { folder: ${JSON.stringify(SAMPLE_DIR)}, recursive: true, limit: 400 };
     TB.app.refresh('photos');
     const until = Date.now() + 10000;
-    while (Date.now() < until && !TB.photos.items.length) await new Promise((resolve) => setTimeout(resolve, 100));
+    while (Date.now() < until && (TB.photos.busy || !TB.photos.items.length)) await new Promise((resolve) => setTimeout(resolve, 100));
     return JSON.stringify({
       calls: calls.map(([at, arg]) => [at, String(arg ?? '').slice(-24)]),
       itemCount: TB.photos.items.length,
@@ -293,6 +296,8 @@ async function main() {
   console.log(`IPC 记账 => ${JSON.stringify(scanned.calls.map((c) => c[0]))}；最前四张的 mtime ${JSON.stringify(scanned.mtimes)}`);
 
   if (scanned.error) failures.push(`真扫 samples/ 报错了：${scanned.error}`);
+  // 这一条盯的就是上面那个竞态：组件认定的文件夹必须先换成 samples/，否则下面比对的全是上一批
+  if (scanned.folder !== SAMPLE_DIR) failures.push(`这一格读的是「${scanned.folder}」，探针喂的却是 ${SAMPLE_DIR}（等到的是上一批缓存）`);
   if (scanned.itemCount !== pngs.length) failures.push(`samples/ 里 ${pngs.length} 个 png，扫出来 ${scanned.itemCount} 张`);
   if (!scanned.prefixes.every((u) => u.startsWith('file:///'))) failures.push(`图片地址不是 file:///：${JSON.stringify(scanned.prefixes)}`);
   if (!scanned.exts.every((e) => e === 'png')) failures.push(`扫进来了别的东西：${JSON.stringify(scanned.exts)}（日志/音频不该进来）`);
@@ -688,14 +693,17 @@ async function main() {
     await new Promise((resolve) => setTimeout(resolve, 500));
     return 'restored';
   })()`);
+  // gauges 这一格只长在生活面板上：他原来要是停在工作面板（第 3 列现在整块是 officezone），
+  // 先切回原页再量 gauges 就必然是 null。所以先验这一格，最后才把他那一页放回去。
+  await evaluate(page, `TB.app.setPage('life');'ok'`);
+  const after = JSON.parse(await evaluateReady(page, MEASURE));
+  if (after.view?.hidden !== true) failures.push('收尾时浮层还开着');
+  if (after.modules?.gauges !== 'photos') failures.push(`收尾后 ${SLOT} 不是 photos 了：${after.modules?.gauges}`);
   try {
     await evaluate(page, `TB.app.setPage(${JSON.stringify(orig.page)});'ok'`);
   } catch (error) {
     failures.push(`切回原面板 "${orig.page}" 失败：${error.message}`);
   }
-  const after = JSON.parse(await evaluateReady(page, MEASURE));
-  if (after.view?.hidden !== true) failures.push('收尾时浮层还开着');
-  if (after.modules?.gauges !== 'photos') failures.push(`收尾后 ${SLOT} 不是 photos 了：${after.modules?.gauges}`);
 
   if (failures.length) {
     for (const line of failures) console.log(`✗ ${line}`);

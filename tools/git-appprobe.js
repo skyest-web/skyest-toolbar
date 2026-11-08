@@ -1,7 +1,7 @@
 // git 格子（工作面板中间那一整块 gitzone，和左列 projzone 上下通高）的真机验证：附着到真实运行的工具栏（需带 --remote-debugging-port 启动）。
 //
 // 这一格现在是「项目格的第二个视图」，所以量的是三件事：
-//   1) 落位与新几何：gitzone 与 projzone 同顶同底同高（两块各合成一整块），宽度等于中间那一列（和 gauges 同列），
+//   1) 落位与新几何：gitzone 与 projzone 同顶同底同高（两块各合成一整块），宽度等于同排的 officezone（第 2、3 列都是 1fr），
 //      三种状态各自都不许被 .area 裁掉；
 //   2) 联动：默认态（左边没点）一句提示 + 一条 IPC 都不发；点左边某一行，右边整块换成那个仓库，
 //      点的还是项目格那一下（左键选中；双击才交给 IDE，这一趟不碰双击）；
@@ -140,7 +140,7 @@ const CELL = `(() => {
   const list = host?.querySelector('.gt-list');
   const font = (n) => (n ? Math.round(parseFloat(getComputedStyle(n).fontSize) * 10) / 10 : null);
   return JSON.stringify({
-    cells: Object.fromEntries(['${SLOT}', '${LEFT}', 'gauges', 'slot2', 'workbench', 'topbar', 'clipboard', 'dock'].map((at) => [at, box(sec(at))])),
+    cells: Object.fromEntries(['${SLOT}', '${LEFT}', 'officezone', 'workbench', 'topbar', 'clipboard', 'dock'].map((at) => [at, box(sec(at))])),
     modules: Object.fromEntries(['${SLOT}', '${LEFT}'].map((at) => [at, sec(at)?.dataset.module || null])),
     gitHostClip: host ? Math.round(host.scrollHeight - host.getBoundingClientRect().height) : null,
     secClip: (() => { const s = sec('${SLOT}'); return s ? Math.round(s.scrollHeight - s.getBoundingClientRect().height) : null; })(),
@@ -242,8 +242,8 @@ async function main() {
   const geo = idle.cells || {};
   const here = geo[SLOT];
   const left = geo[LEFT];
-  const gauge = geo.gauges;
-  console.log(`格子 ${here?.w}x${here?.h} @(${here?.x},${here?.y})；左列 projzone ${left?.w}x${left?.h} @(${left?.x},${left?.y})；同列 gauges ${gauge?.w}x${gauge?.h}`);
+  const gauge = geo.officezone;
+  console.log(`格子 ${here?.w}x${here?.h} @(${here?.x},${here?.y})；左列 projzone ${left?.w}x${left?.h} @(${left?.x},${left?.y})；同排的 officezone ${gauge?.w}x${gauge?.h}`);
   if (!here) failures.push(`DOM 上没有 data-slot="${SLOT}" 这一格（工作面板那份 grid 没落位？）`);
   else {
     if (here.h < 300) failures.push(`gitzone 只有 ${here.h}px 高：两块合成一整块以后该是第 2+3 行通高（旧尺寸 176px 会被这条咬住）`);
@@ -251,10 +251,11 @@ async function main() {
     if (left && Math.abs(here.h - left.h) > 2) failures.push(`左右两块不同高：gitzone ${here.h} vs projzone ${left.h}（都是第 2+3 行通高，必须齐）`);
     if (left && (Math.abs(here.y - left.y) > 2 || Math.abs(here.bottom - left.bottom) > 2)) failures.push(`左右两块没对齐同一批行：${JSON.stringify([here, left])}`);
     if (left && here.x < left.right - 2) failures.push(`gitzone 不在 projzone 右边：${here.x} vs 左块右边 ${left.right}（联动靠他往右看一眼）`);
-    if (gauge && Math.abs(here.w - gauge.w) > 2) failures.push(`gitzone 宽 ${here.w} 和同列的 gauges ${gauge.w} 不一样：第 2 列不该两种宽`);
-    if (gauge && Math.abs(here.y - gauge.y) > 2) failures.push(`gitzone 顶边和同列的 gauges 不齐：${here.y} vs ${gauge.y}（两块都从第 2 行起）`);
-    // 注意比的是 bottom：gauges 只占第 2 行（176px），gitzone 占第 2+3 行，正确几何下它的下沿必须越过 gauges 的下沿
-    if (gauge && here.bottom <= gauge.bottom + 2) failures.push(`gitzone 到 gauges 那一行就停了（${here.bottom} vs 该行下沿 ${gauge.bottom}）：没跨过第 3 行，原 slot1 那块没合进来`);
+    // 第 2、3 列都是 minmax(0,1fr)，所以同排的 officezone 就是那一列宽度的尺子
+    if (gauge && Math.abs(here.w - gauge.w) > 2) failures.push(`gitzone 宽 ${here.w} 和同排的 officezone ${gauge.w} 不一样：第 2、3 列都是 1fr，该等宽`);
+    if (gauge && Math.abs(here.y - gauge.y) > 2) failures.push(`gitzone 顶边和同排的 officezone 不齐：${here.y} vs ${gauge.y}（两块都从第 2 行起）`);
+    // 注意比的是 bottom：两块都吃第 2+3 行，下沿必须齐——谁只占一行就说明那一列没合成
+    if (gauge && Math.abs(here.bottom - gauge.bottom) > 2) failures.push(`gitzone 下沿 ${here.bottom} 和 officezone 下沿 ${gauge.bottom} 不齐：有一块没跨过第 3 行`);
   }
   for (const [at, rect] of Object.entries(geo)) {
     if (rect && /undefined|NaN/.test(JSON.stringify(rect))) failures.push(`格子 ${at} 的矩形读不出数字：${JSON.stringify(rect)}`);
@@ -276,7 +277,7 @@ async function main() {
     });
   })()`));
   console.log(`其余：work 格子=${others.workSlots}（${others.workProjects}+${others.workGit}）/ home clock=${others.homeClock} player=${others.homePlayer} / life leftzone=${others.lifeLeftzone} / game gamezone=${others.gameZone} / 常驻 ${others.shared.join(',')}`);
-  if (others.workSlots !== 'projzone,gitzone,gauges,workbench,slot2') failures.push(`工作面板的格子清单是 "${others.workSlots}"，应为 projzone,gitzone,gauges,workbench,slot2（slot1/player/clock 都该被合掉了）`);
+  if (others.workSlots !== 'projzone,gitzone,officezone,workbench') failures.push(`工作面板的格子清单是 "${others.workSlots}"，应为 projzone,gitzone,officezone,workbench（slot1/player/clock/gauges/slot2 都该被合掉了）`);
   if (others.homeClock !== 'clock') failures.push(`主界面的时钟被这一格顶掉了：${others.homeClock}`);
   if (others.homePlayer !== 'player') failures.push(`主界面的播放器被这一格顶掉了：${others.homePlayer}`);
   if (others.lifeLeftzone !== 'mail') failures.push(`生活面板的邮箱那格被动了：${others.lifeLeftzone}`);

@@ -36,6 +36,9 @@ const DEFAULTS = {
   // 仓库根目录（项目格与 git 格共用这一份）：每个根取它的**顶层文件夹**当一个项目。
   // 数组可以多条，同一条目录在两个根里都出现只算一次（按小写绝对路径去重，Windows 不分大小写）。
   repos: { roots: ['D:\\GitProject'] },
+  // 办公文档文件夹（工作面板 officezone 那一整块）：递归扫这个目录里的 Word / Excel / PPT / PDF。
+  // 只列不改：点开交给系统默认程序，主进程不写任何文件。limit 是一次扫描的条数上限（防指到整盘）。
+  office: { folder: 'D:\\OneDrive\\办公', recursive: true, limit: 300 },
   ai: {
     model: 'deepseek-chat',
     systemPrompt: '你是常驻在桌面工具栏里的助手，回答尽量简短。',
@@ -157,6 +160,7 @@ function save(appRoot, config) {
     trainers: config.trainers,
     steam: config.steam,
     repos: config.repos,
+    office: config.office,
     ai: config.ai,
     voice: config.voice,
     dsh: config.dsh,

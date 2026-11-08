@@ -170,6 +170,22 @@ TB.settings = {
       }
     });
 
+    // ----- 办公文档（工作面板第 3 列那一整块）-----
+    const officeFolder = TB.util.el('input', {
+      class: 'input',
+      type: 'text',
+      value: config.office?.folder || '',
+      placeholder: '例如 D:\\OneDrive\\办公'
+    });
+    const officeBrowse = TB.util.el('button', {
+      class: 'ghost-btn',
+      text: '浏览…',
+      onclick: async () => {
+        const picked = await TB.api.office.pickFolder();
+        if (picked) officeFolder.value = picked;
+      }
+    });
+
     // ----- AI（密钥即时加密写入 userData/ai-key.bin，不跟随「保存并应用」） -----
     const keyState = state.ai?.key || { set: false, hint: null };
     const keyInput = TB.util.el('input', { class: 'input', type: 'password', placeholder: keyState.set ? `已保存 ${keyState.hint}` : 'sk-…', spellcheck: 'false', autocomplete: 'off' });
@@ -650,6 +666,15 @@ TB.settings = {
       )
     );
 
+    const officeCard = this.card(
+      '办公文档',
+      this.field(
+        '文件夹',
+        TB.util.el('div', { class: 'inline' }, [officeFolder, officeBrowse]),
+        '递归扫这里面的 Word（doc/docx）/ Excel（xls/xlsx/csv）/ PPT（ppt/pptx）/ PDF，按最近改动排；只列不改，点开交给系统默认程序。改完保存后点格子上的「重扫」'
+      )
+    );
+
     const moduleCard = TB.util.el('section', { class: 'card' }, [
       TB.util.el('h3', { text: '组件与位置' }),
       TB.util.el('p', { class: 'muted', text: `位置固定（当前 ${gridSummary}），换组件或关掉不显示都在面板里做；改动直接写入 layout.json` }),
@@ -679,7 +704,7 @@ TB.settings = {
       TB.util.el('div', { class: 'settings-grid' }, [
         screenCard,
         refreshCard,
-        TB.util.el('div', { class: 'card-col' }, [musicCard, trainersCard, steamCard, reposCard, aiCard, voiceCard, searchCard, mailCard, biliCard, moduleCard]),
+        TB.util.el('div', { class: 'card-col' }, [musicCard, trainersCard, steamCard, reposCard, officeCard, aiCard, voiceCard, searchCard, mailCard, biliCard, moduleCard]),
         dockCard
       ]),
       TB.util.el('div', { class: 'settings-footer' }, [
@@ -711,6 +736,8 @@ TB.settings = {
             config.steam = { folder: steamFolder.value.trim() };
             // 去空行、按小写去重（Windows 路径不分大小写）、最多 12 条：再多这一格也摆不下
             config.repos = { roots: uniqueRoots(reposRoots.value.split('\n')).slice(0, 12) };
+            // 只改 folder：recursive / limit 是这一格自己的规矩，不该被这张卡片顺手重置
+            config.office = { ...config.office, folder: officeFolder.value.trim() };
             config.ai = {
               ...config.ai,
               model: aiModel.value,

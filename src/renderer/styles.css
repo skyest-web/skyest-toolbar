@@ -507,10 +507,17 @@ body:not(.ready) .shell {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* 历史是往头部插的：不关锚定，复制一次滚动位置就被拽着跳 */
+  overflow-anchor: none;
   padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* 纵向 flex 里的行默认会被压扁：格子只有 176px 高，三十条历史会把每行挤成几 px 的空壳 */
+.clip-list > * {
+  flex: 0 0 auto;
 }
 
 .clip-item {
@@ -525,7 +532,8 @@ body:not(.ready) .shell {
   cursor: pointer;
   text-align: left;
   font: inherit;
-  font-size: 0.82rem;
+  /* root 是 15px：0.82rem 只有 12.3px，这屏 dpr=1 的正文下限是 13px */
+  font-size: 0.88rem;
 }
 
 .clip-item:hover {
@@ -535,7 +543,7 @@ body:not(.ready) .shell {
 .clip-time {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   flex: 0 0 auto;
 }
 
@@ -1031,6 +1039,166 @@ body:not(.ready) .shell {
   font-size: 0.74rem;
   color: var(--warn);
   padding: 1px 8px;
+  word-break: break-all;
+}
+
+/* ---------- office（工作面板第 3 列那一整块 officezone：Word / Excel / PPT / PDF，约 572×402）---------- */
+/* 竖向吃满整块、超出交给 .of-list 自己滚——.area 是 overflow:hidden，内容超了不报错，只是看不见。
+   截断还是那条老规矩：交给 .of-name / .of-dir 自己省略，.of-item 不写 overflow:hidden，
+   免得内容盒在横向 flex 行里塌成 0（DOM 全在、探针全绿，人却看不清）。
+   基准 0.88rem = 13.2px：这屏 dpr=1，行文字低于 13px 就看不清了。 */
+.office-area {
+  display: flex;
+  flex-direction: column;
+}
+
+.office-area #office {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  gap: 5px;
+  padding: 6px 8px;
+}
+
+.of-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.of-count {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 四类单子占掉右边那截，「重扫」永远在最右——和 .pj-head 那句 margin-left:auto 同一件事，
+   只是这里先由筛选条占位，所以 auto 挪到筛选条上。 */
+.of-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.of-head .link-btn {
+  flex: 0 0 auto;
+}
+
+.of-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-anchor: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* 每一条按内容排，装不下就滚——不许被 flex-shrink 压扁（.gt-list 同一条老教训） */
+.of-list > * {
+  flex: 0 0 auto;
+}
+
+.of-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.88rem;
+  padding: 2px 8px;
+  min-height: 26px;
+  cursor: pointer;
+}
+
+.of-item:hover {
+  border-color: var(--accent);
+}
+
+.of-item:hover .of-ago {
+  color: var(--text);
+}
+
+/* 类别牌子就是「点下去会起哪个软件」的预告，所以四色分开，不靠文字猜 */
+.of-kind {
+  flex: 0 0 auto;
+  min-width: 34px;
+  text-align: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.of-kind.kind-word {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.of-kind.kind-sheet {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.of-kind.kind-slides {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.of-kind.kind-pdf {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.of-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+/* 递归扫出来的子目录名：办公文件夹通常按年份/项目分子目录，这一小段就是「那份在哪」 */
+.of-dir {
+  flex: 0 0 auto;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.of-ago {
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 五种「没东西可看」的话各占一句（没配置 / 相对路径 / 目录没了 / 不是目录 / 没权限 / 里面没文档），
+   居中摆在这块里，看着像「在等人」而不是「读完了但被裁掉了」 */
+.of-note {
+  margin: auto 0;
+  padding: 16px 10px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
   word-break: break-all;
 }
 

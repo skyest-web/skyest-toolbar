@@ -40,7 +40,10 @@
     "projects:check": "node ./tools/projects-check.js",
     "projects:appprobe": "node ./tools/projects-appprobe.js",
     "git:check": "node ./tools/git-check.js",
-    "git:appprobe": "node ./tools/git-appprobe.js"
+    "git:appprobe": "node ./tools/git-appprobe.js",
+    "office:check": "node ./tools/office-check.js",
+    "office:appprobe": "node ./tools/office-appprobe.js",
+    "clipboard:appprobe": "node ./tools/clipboard-appprobe.js"
   },
   "dependencies": {
     "@deepseek-ai/dsh": "^0.2.1-rc.2",
